@@ -23,8 +23,11 @@ import {
   Briefcase,
   Inbox,
   Settings,
+  LogOut,
+  LogIn,
 } from "lucide-react";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -614,9 +617,15 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
 
 function WhatsAppView() {
   const [showSetup, setShowSetup] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [activeGroup, setActiveGroup] = useState("flipkart");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const messages = WA_MESSAGES[activeGroup] ?? [];
   const group = WA_GROUPS.find((g) => g.id === activeGroup)!;
+
+  if (!mounted) return null;
 
   return (
     <div className="space-y-6">
@@ -638,11 +647,11 @@ function WhatsAppView() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Connection</h2>
-            <WhatsAppConnector onConnected={() => {}} />
+            <WhatsAppConnector onConnected={() => setRefreshKey(k => k + 1)} />
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Monitored Groups</h2>
-            <GroupSelector />
+            <GroupSelector key={refreshKey} />
           </div>
         </div>
       ) : (
@@ -1016,7 +1025,13 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function TaskPulse() {
+  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [demoMode, setDemoMode] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -1098,17 +1113,54 @@ export default function TaskPulse() {
           ))}
         </nav>
 
-        {/* Demo Mode toggle */}
-        <div className="flex items-center gap-2 min-w-[140px] justify-end">
-          <span className="text-xs font-semibold text-gray-500">Demo Mode</span>
-          <button
-            onClick={() => setDemoMode((p) => !p)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${demoMode ? "bg-green-500" : "bg-gray-300"}`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
-            />
-          </button>
+        {/* User Auth */}
+        <div className="flex items-center gap-4 min-w-[140px] justify-end">
+          {!mounted ? (
+            <div className="w-8 h-8 rounded-full bg-gray-100 animate-pulse" />
+          ) : status === "authenticated" ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Logged in as</p>
+                <p className="text-xs font-bold text-gray-800">{session.user?.name}</p>
+              </div>
+              <div className="group relative">
+                {session.user?.image ? (
+                  <img src={session.user.image} alt="User" className="w-8 h-8 rounded-full border-2 border-white shadow-sm ring-1 ring-gray-100" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                    {session.user?.name?.charAt(0)}
+                  </div>
+                )}
+                <button 
+                  onClick={() => signOut()}
+                  className="absolute right-0 top-10 bg-white border border-gray-100 shadow-xl rounded-xl px-3 py-2 text-xs font-bold text-red-500 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto whitespace-nowrap"
+                >
+                  <LogOut size={12} /> Sign Out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => signIn("google")}
+              className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+            >
+              <LogIn size={14} /> Login with Google
+            </button>
+          )}
+          
+          <div className="h-4 w-px bg-gray-100 mx-1 hidden sm:block"></div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">Demo</span>
+            <button
+              onClick={() => setDemoMode((p) => !p)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${demoMode ? "bg-green-500" : "bg-gray-300"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </div>
         </div>
       </header>
 

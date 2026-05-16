@@ -19,23 +19,23 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ExtractedTask {
-  id:             string;
-  userId:         string;
-  title:          string;
-  priority:       "High" | "Medium" | "Low";
-  deadline:       string | null;   // ISO date or null
-  assignee:       string | null;   // Name of person task is assigned to
-  confidence:     number;          // 0–100
-  status:         "confirmed" | "unconfirmed";
+  id: string;
+  userId: string;
+  title: string;
+  priority: "High" | "Medium" | "Low";
+  deadline: string | null;   // ISO date or null
+  assignee: string | null;   // Name of person task is assigned to
+  confidence: number;          // 0–100
+  status: "confirmed" | "unconfirmed";
   sourcePayload: {
-    platform:    "whatsapp";
-    groupName:   string;
-    groupJid:    string;
-    senderName:  string;
+    platform: "whatsapp";
+    groupName: string;
+    groupJid: string;
+    senderName: string;
     senderPhone: string;
     messageText: string;
-    timestamp:   number;
-    messageId:   string;
+    timestamp: number;
+    messageId: string;
   };
 }
 
@@ -92,9 +92,9 @@ RESPOND ONLY WITH VALID JSON — no markdown, no explanation outside the JSON:
 function buildUserPrompt(msg: IncomingMessage, senderRole: string): string {
   const contextBlock = msg.threadContext.length > 0
     ? `THREAD CONTEXT (last ${msg.threadContext.length} messages before this one):\n` +
-      msg.threadContext
-        .map((m) => `  [${m.senderName}]: "${m.text}"`)
-        .join("\n")
+    msg.threadContext
+      .map((m) => `  [${m.senderName}]: "${m.text}"`)
+      .join("\n")
     : "THREAD CONTEXT: (no prior messages available)";
 
   return `${contextBlock}
@@ -116,10 +116,10 @@ export class AIExtractionService {
 
     let parsed: any;
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", systemInstruction: SYSTEM_PROMPT });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: SYSTEM_PROMPT });
       const result = await model.generateContent(buildUserPrompt(msg, senderRole));
       const text = result.response.text().trim();
-      
+
       // Clean possible markdown formatting
       const jsonStr = text.replace(/```json\n?|\n?```/g, "");
       parsed = JSON.parse(jsonStr);
@@ -136,23 +136,23 @@ export class AIExtractionService {
     }
 
     const task: ExtractedTask = {
-      id:         crypto.randomUUID(),
+      id: crypto.randomUUID(),
       userId,
-      title:      parsed.task_title,
-      priority:   parsed.priority,
-      deadline:   parsed.deadline ?? null,
-      assignee:   parsed.assignee ?? null,
+      title: parsed.task_title,
+      priority: parsed.priority,
+      deadline: parsed.deadline ?? null,
+      assignee: parsed.assignee ?? null,
       confidence: parsed.confidence,
-      status:     parsed.confidence >= 85 ? "confirmed" : "unconfirmed",
+      status: parsed.confidence >= 85 ? "confirmed" : "unconfirmed",
       sourcePayload: {
-        platform:    "whatsapp",
-        groupName:   msg.groupName,
-        groupJid:    msg.groupJid,
-        senderName:  msg.senderName,
+        platform: "whatsapp",
+        groupName: msg.groupName,
+        groupJid: msg.groupJid,
+        senderName: msg.senderName,
         senderPhone: msg.senderPhone,
         messageText: msg.messageText,
-        timestamp:   msg.timestamp,
-        messageId:   msg.messageId,
+        timestamp: msg.timestamp,
+        messageId: msg.messageId,
       },
     };
 
@@ -162,22 +162,22 @@ export class AIExtractionService {
 
   private async saveTask(task: ExtractedTask): Promise<void> {
     await supabaseAdmin.from("tasks").insert({
-      id:           task.id,
-      user_id:      task.userId,
-      title:        task.title,
-      priority:     task.priority,
-      deadline:     task.deadline,
-      assignee:     task.assignee,
-      confidence:   task.confidence,
-      status:       task.status,
+      id: task.id,
+      user_id: task.userId,
+      title: task.title,
+      priority: task.priority,
+      deadline: task.deadline,
+      assignee: task.assignee,
+      confidence: task.confidence,
+      status: task.status,
       source_platform: "whatsapp",
       source_group_name: task.sourcePayload.groupName,
-      source_group_jid:  task.sourcePayload.groupJid,
+      source_group_jid: task.sourcePayload.groupJid,
       source_sender_name: task.sourcePayload.senderName,
       source_message_text: task.sourcePayload.messageText,
       source_timestamp: new Date(task.sourcePayload.timestamp * 1000).toISOString(),
       source_message_id: task.sourcePayload.messageId,
-      created_at:   new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
   }
 

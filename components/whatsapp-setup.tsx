@@ -19,6 +19,17 @@ export function WhatsAppConnector({ onConnected }: { onConnected: () => void }) 
   const [phone, setPhone]     = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
 
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const r = await fetch("/api/whatsapp/status");
+        const d = await r.json();
+        if (d.status === "connected") setStatus("connected");
+      } catch {}
+    };
+    checkStatus();
+  }, []);
+
   const startConnection = async () => {
     setStatus("connecting");
     setError(null);
@@ -146,7 +157,14 @@ export function GroupSelector() {
   useEffect(() => {
     fetch("/api/whatsapp/groups")
       .then(r => r.json())
-      .then(setGroups)
+      .then(data => {
+        if (Array.isArray(data)) {
+          setGroups(data);
+        } else {
+          setGroups([]);
+        }
+      })
+      .catch(() => setGroups([]))
       .finally(() => setLoading(false));
   }, []);
 
