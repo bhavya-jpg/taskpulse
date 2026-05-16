@@ -22,7 +22,9 @@ import {
   Users,
   Briefcase,
   Inbox,
+  Settings,
 } from "lucide-react";
+import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -611,103 +613,130 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
 // ─── VIEW: WHATSAPP ───────────────────────────────────────────────────────────
 
 function WhatsAppView() {
+  const [showSetup, setShowSetup] = useState(false);
   const [activeGroup, setActiveGroup] = useState("flipkart");
   const messages = WA_MESSAGES[activeGroup] ?? [];
   const group = WA_GROUPS.find((g) => g.id === activeGroup)!;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Mock WhatsApp</h1>
-      <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 bg-white" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
-        {/* Left panel */}
-        <div className="w-72 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
-          <div className="bg-[#075E54] text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
-            <MessageCircle size={16} /> Groups
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {WA_GROUPS.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => setActiveGroup(g.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 text-left ${activeGroup === g.id ? "bg-green-50" : ""}`}
-              >
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {g.name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{g.name}</p>
-                  <p className="text-xs text-gray-400">{g.members} members</p>
-                </div>
-                {g.unread > 0 && (
-                  <span className="bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
-                    {g.unread}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">WhatsApp Integration</h1>
+          <p className="text-sm text-gray-500">Manage your connected WhatsApp groups and task extraction.</p>
         </div>
-
-        {/* Right panel */}
-        <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5 url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PC9zdmc+')" }}>
-          {/* Chat header */}
-          <div className="bg-[#075E54] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
-            <div className="w-9 h-9 rounded-full bg-green-300 flex items-center justify-center text-[#075E54] font-bold text-sm">
-              {group.name.charAt(0)}
-            </div>
-            <div>
-              <p className="font-semibold text-sm">{group.name}</p>
-              <p className="text-xs text-green-200">{group.members} members</p>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" style={{ background: "#e5ddd5" }}>
-            <AnimatePresence>
-              {messages.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex flex-col ${msg.outgoing ? "items-end" : "items-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] px-3 py-2 rounded-xl shadow-sm text-sm ${
-                      msg.outgoing
-                        ? "bg-[#DCF8C6] rounded-tr-sm"
-                        : "bg-white rounded-tl-sm"
-                    }`}
-                  >
-                    {!msg.outgoing && (
-                      <p className="text-xs font-semibold text-green-600 mb-0.5">{msg.sender}</p>
-                    )}
-                    <p className="text-gray-800 leading-relaxed">{msg.message}</p>
-                    <p className="text-[10px] text-gray-400 text-right mt-1">{msg.time}</p>
-                  </div>
-                  {msg.hasTask && (
-                    <div className="mt-1 bg-blue-100 border border-blue-300 text-blue-700 text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1">
-                      🤖 Task Extracted by TaskPulse
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {/* Input bar */}
-          <div className="bg-[#f0f0f0] border-t border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-            <input
-              type="text"
-              placeholder="Type a message"
-              className="flex-1 bg-white rounded-full px-4 py-2 text-sm text-gray-600 outline-none border border-gray-200"
-              readOnly
-            />
-            <button className="w-9 h-9 bg-[#075E54] rounded-full flex items-center justify-center text-white hover:bg-[#128C7E] transition-colors">
-              <Send size={15} />
-            </button>
-          </div>
-        </div>
+        <button 
+          onClick={() => setShowSetup(!showSetup)}
+          className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+        >
+          <Settings size={16} />
+          {showSetup ? "Back to Chat" : "Setup WhatsApp"}
+        </button>
       </div>
+
+      {showSetup ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Connection</h2>
+            <WhatsAppConnector onConnected={() => {}} />
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Monitored Groups</h2>
+            <GroupSelector />
+          </div>
+        </div>
+      ) : (
+        <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 bg-white" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
+          {/* Left panel */}
+          <div className="w-72 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
+            <div className="bg-[#075E54] text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
+              <MessageCircle size={16} /> Groups
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {WA_GROUPS.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setActiveGroup(g.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 text-left ${activeGroup === g.id ? "bg-green-50" : ""}`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {g.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{g.name}</p>
+                    <p className="text-xs text-gray-400">{g.members} members</p>
+                  </div>
+                  {g.unread > 0 && (
+                    <span className="bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                      {g.unread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right panel */}
+          <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5" }}>
+            {/* Chat header */}
+            <div className="bg-[#075E54] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-green-300 flex items-center justify-center text-[#075E54] font-bold text-sm">
+                {group.name.charAt(0)}
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{group.name}</p>
+                <p className="text-xs text-green-200">{group.members} members</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" style={{ background: "#e5ddd5" }}>
+              <AnimatePresence>
+                {messages.map((msg, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex flex-col ${msg.outgoing ? "items-end" : "items-start"}`}
+                  >
+                    <div
+                      className={`max-w-[70%] px-3 py-2 rounded-xl shadow-sm text-sm ${
+                        msg.outgoing
+                          ? "bg-[#DCF8C6] rounded-tr-sm"
+                          : "bg-white rounded-tl-sm"
+                      }`}
+                    >
+                      {!msg.outgoing && (
+                        <p className="text-xs font-semibold text-green-600 mb-0.5">{msg.sender}</p>
+                      )}
+                      <p className="text-gray-800 leading-relaxed">{msg.message}</p>
+                      <p className="text-[10px] text-gray-400 text-right mt-1">{msg.time}</p>
+                    </div>
+                    {msg.hasTask && (
+                      <div className="mt-1 bg-blue-100 border border-blue-300 text-blue-700 text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1">
+                        🤖 Task Extracted by TaskPulse
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {/* Input bar */}
+            <div className="bg-[#f0f0f0] border-t border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+              <input
+                type="text"
+                placeholder="Type a message (Read-only simulation)"
+                className="flex-1 bg-white rounded-full px-4 py-2 text-sm text-gray-400 italic outline-none border border-gray-200"
+                readOnly
+              />
+              <button className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center text-white cursor-not-allowed">
+                <Send size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1000,6 +1029,27 @@ export default function TaskPulse() {
 
   const dismissToast = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
 
+  // WhatsApp Task Streaming
+  useTaskStream((newTask: any) => {
+    // Map extracted task to dashboard task type
+    const mapped: Task = {
+      id: Date.now(), // Local ephemeral ID for UI
+      title: newTask.title,
+      client: newTask.sourcePayload.groupName.split(' ')[0], // Best effort client detection
+      assignedTo: newTask.assignee || "Unassigned",
+      deadline: newTask.deadline || new Date().toISOString().split('T')[0],
+      priority: newTask.priority,
+      source: "whatsapp",
+      sourceGroup: newTask.sourcePayload.groupName,
+      status: newTask.status === "confirmed" ? "pending" : "pending", // Dashboard uses 'pending'
+      confidence: newTask.confidence,
+      sourceMessage: newTask.sourcePayload.messageText,
+    };
+    
+    setTasks((prev) => [mapped, ...prev]);
+    addToast(`New task detected from WhatsApp: ${newTask.title}`);
+  });
+
   const markDone = (id: number) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: "done" } : t));
     addToast("Task marked as done!");
@@ -1024,6 +1074,10 @@ export default function TaskPulse() {
         <div className="flex items-center gap-2 min-w-[160px]">
           <span className="text-xl">📋</span>
           <span className="font-extrabold text-gray-900 text-lg tracking-tight">TaskPulse</span>
+        </div>
+
+        <div className="flex items-center ml-4">
+          <WAStatusBadge />
         </div>
 
         {/* Tabs */}
