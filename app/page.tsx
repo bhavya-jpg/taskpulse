@@ -192,6 +192,7 @@ function TaskCard({
   onMarkDone,
   onConfirm,
   onDismiss,
+  onEdit,
   showConfirmButtons = false,
   showFrom = false,
 }: {
@@ -199,10 +200,13 @@ function TaskCard({
   onMarkDone?: (id: number) => void;
   onConfirm?: (id: number) => void;
   onDismiss?: (id: number) => void;
+  onEdit?: (id: number, title: string) => void;
   showConfirmButtons?: boolean;
   showFrom?: boolean;
 }) {
   const [showSource, setShowSource] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
   const pc = PRIORITY_CONFIG[task.priority];
   const cc = CLIENT_COLORS[task.client];
   const overdue = isOverdue(task.deadline) && task.status !== "done";
@@ -218,9 +222,20 @@ function TaskCard({
       <div className="p-4">
         {/* Row 1: Title + Priority dot */}
         <div className="flex items-start justify-between gap-2 mb-2">
+          {editing ? (
+            <input
+              autoFocus
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => { setEditing(false); onEdit?.(task.id, editTitle); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { setEditing(false); onEdit?.(task.id, editTitle); } if (e.key === "Escape") { setEditing(false); setEditTitle(task.title); } }}
+              className="flex-1 border border-blue-300 rounded-lg px-2 py-1 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          ) : (
           <p className={`font-semibold text-[15px] leading-snug text-gray-800 ${task.status === "done" ? "line-through text-gray-400" : ""}`}>
-            {task.title}
+            {editTitle}
           </p>
+          )}
           <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
             <span className={`w-2 h-2 rounded-full ${pc.dot}`} />
             <span className={`text-xs font-semibold ${pc.text}`}>{task.priority}</span>
@@ -318,7 +333,10 @@ function TaskCard({
               >
                 ❌ Dismiss
               </button>
-              <button className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors border border-gray-200">
+              <button
+                onClick={() => { setEditing(true); setEditTitle(task.title); }}
+                className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors border border-gray-200"
+              >
                 ✏️ Edit
               </button>
             </>
@@ -370,11 +388,13 @@ function DashboardView({
   onMarkDone,
   onConfirm,
   onDismiss,
+  onEdit,
 }: {
   tasks: Task[];
   onMarkDone: (id: number) => void;
   onConfirm: (id: number) => void;
   onDismiss: (id: number) => void;
+  onEdit: (id: number, title: string) => void;
 }) {
   const confirmed = tasks.filter((t) => t.status === "pending" && t.confidence >= 85);
   const unconfirmed = tasks.filter((t) => t.confidence < 85 && t.status !== "done");
@@ -403,7 +423,7 @@ function DashboardView({
               <EmptyState message="No tasks here yet 🎉" />
             ) : (
               sorted.map((t) => (
-                <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
+                <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} onEdit={onEdit} />
               ))
             )}
           </AnimatePresence>
@@ -422,7 +442,7 @@ function DashboardView({
               <EmptyState message="No unconfirmed tasks 🎉" />
             ) : (
               unconfirmed.map((t) => (
-                <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} />
+                <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} onEdit={onEdit} />
               ))
             )}
           </AnimatePresence>
@@ -649,7 +669,7 @@ function WhatsAppView() {
         </div>
 
         {/* Right panel */}
-        <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5 url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PC9zdmc+')" }}>
+        <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5" }}>
           {/* Chat header */}
           <div className="bg-[#075E54] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
             <div className="w-9 h-9 rounded-full bg-green-300 flex items-center justify-center text-[#075E54] font-bold text-sm">
@@ -714,11 +734,34 @@ function WhatsAppView() {
 
 // ─── VIEW: EMAIL ──────────────────────────────────────────────────────────────
 
-function EmailView({ onToast }: { onToast: (msg: string) => void }) {
+function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void; setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) {
   const [selected, setSelected] = useState(1);
+  const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
 
   const email = EMAILS.find((e) => e.id === selected)!;
   const cc = email.client ? CLIENT_COLORS[email.client] : null;
+
+  const handleAddToDashboard = () => {
+    if (!email.task || !email.client) return;
+    setTasks((prev) => {
+      const newTask: Task = {
+        id: Date.now(),
+        title: email.task!.title,
+        client: email.client!,
+        assignedTo: email.task!.assignedTo,
+        deadline: email.task!.deadline,
+        priority: email.task!.priority as Priority,
+        source: "email",
+        sourceGroup: email.subject,
+        status: "pending",
+        confidence: 90,
+        sourceMessage: email.body,
+      };
+      return [...prev, newTask];
+    });
+    setAddedIds((p) => new Set(p).add(email.id));
+    onToast("Task added to dashboard!");
+  };
 
   return (
     <div>
@@ -804,10 +847,11 @@ function EmailView({ onToast }: { onToast: (msg: string) => void }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => onToast("Task added to dashboard!")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                  onClick={handleAddToDashboard}
+                  disabled={addedIds.has(email.id)}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-green-600 disabled:cursor-default text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
                 >
-                  ✅ Add to Dashboard
+                  {addedIds.has(email.id) ? "✅ Added to Dashboard" : "✅ Add to Dashboard"}
                 </button>
               </motion.div>
             )}
@@ -934,8 +978,8 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
               <div className="bg-green-500 text-white px-4 py-2 text-sm font-bold">
                 ✅ Task Successfully Extracted!
               </div>
-              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
+              <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div className="col-span-2 md:col-span-2">
                   <p className="text-xs text-gray-500 mb-0.5">Task</p>
                   <p className="font-semibold text-gray-800">{result.title}</p>
                 </div>
@@ -948,6 +992,10 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.priority === "High" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                     {result.priority}
                   </span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Deadline</p>
+                  <p className="font-semibold text-gray-800">{formatDate(result.deadline)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Confidence</p>
@@ -1013,6 +1061,11 @@ export default function TaskPulse() {
   const dismissTask = (id: number) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     addToast("Task dismissed.");
+  };
+
+  const editTaskTitle = (id: number, title: string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title } : t));
+    addToast("Task updated!");
   };
 
   return (
@@ -1082,6 +1135,7 @@ export default function TaskPulse() {
                 onMarkDone={markDone}
                 onConfirm={confirmTask}
                 onDismiss={dismissTask}
+                onEdit={editTaskTitle}
               />
             )}
             {activeTab === "client" && (
@@ -1091,7 +1145,7 @@ export default function TaskPulse() {
               <EmployeeView tasks={tasks} onMarkDone={markDone} />
             )}
             {activeTab === "whatsapp" && <WhatsAppView />}
-            {activeTab === "email" && <EmailView onToast={addToast} />}
+            {activeTab === "email" && <EmailView onToast={addToast} setTasks={setTasks} />}
           </motion.div>
         </AnimatePresence>
       </main>
