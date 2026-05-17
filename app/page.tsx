@@ -787,15 +787,56 @@ function WhatsAppView() {
 
 // ─── VIEW: EMAIL ──────────────────────────────────────────────────────────────
 
-function EmailView({ onToast }: { onToast: (msg: string) => void }) {
+function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) {
   const [selected, setSelected] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRealEmails = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/gmail");
+      if (res.status === 401) {
+        onToast("Not authenticated. Please connect Gmail first.");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.tasks) {
+        setTasks(prev => [...data.tasks, ...prev]);
+        onToast(`Successfully extracted ${data.tasks.length} tasks from real Gmail!`);
+      } else if (data.error) {
+        onToast(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      onToast("Failed to fetch emails.");
+    }
+    setLoading(false);
+  };
 
   const email = EMAILS.find((e) => e.id === selected)!;
   const cc = email.client ? CLIENT_COLORS[email.client] : null;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Mock Email Inbox</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Email Integration</h1>
+        <div className="flex gap-3">
+          <button
+            onClick={() => window.location.href = "/api/auth/login"}
+            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm"
+          >
+            📧 Connect Gmail
+          </button>
+          <button
+            onClick={fetchRealEmails}
+            disabled={loading}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : "📨"}
+            {loading ? "🤖 AI Reading Emails..." : "Fetch Real Emails"}
+          </button>
+        </div>
+      </div>
       <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
         {/* Left panel */}
         <div className="w-80 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
@@ -1056,7 +1097,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
   { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
   { id: "whatsapp",  label: "Mock WhatsApp", icon: <MessageCircle size={15} /> },
-  { id: "email",     label: "Mock Email",    icon: <Mail size={15} /> },
+  { id: "email",     label: "Email",    icon: <Mail size={15} /> },
 ];
 
 export default function TaskPulse() {
@@ -1325,7 +1366,7 @@ export default function TaskPulse() {
               <EmployeeView tasks={tasks} onMarkDone={markDone} />
             )}
             {activeTab === "whatsapp" && <WhatsAppView />}
-            {activeTab === "email" && <EmailView onToast={addToast} />}
+            {activeTab === "email" && <EmailView onToast={addToast} setTasks={setTasks} />}
           </motion.div>
         </AnimatePresence>
       </main>
