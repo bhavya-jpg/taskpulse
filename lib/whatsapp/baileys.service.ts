@@ -342,10 +342,37 @@ export class BaileysService extends EventEmitter {
   async gracefulDisconnect(userId: string): Promise<void> {
     const session = this.sessions.get(userId);
     if (!session?.socket) return;
-    await session.socket.logout();
+    try {
+      await session.socket.logout();
+    } catch {}
     session.socket = null;
     session.status = "disconnected";
     this.emit("disconnected", { userId });
+  }
+
+  async resetSession(userId: string): Promise<void> {
+    const session = this.sessions.get(userId);
+    if (session) {
+      try {
+        if (session.socket) {
+          session.socket.ev.removeAllListeners("connection.update");
+          session.socket.ev.removeAllListeners("creds.update");
+          session.socket.ev.removeAllListeners("messages.upsert");
+          session.socket.end(new Error("Reset session"));
+        }
+      } catch (err) {}
+      this.sessions.delete(userId);
+    }
+
+    // Completely wipe the directory
+    const authDir = path.join(AUTH_BASE_PATH, userId);
+    if (fs.existsSync(authDir)) {
+      try {
+        fs.rmSync(authDir, { recursive: true, force: true });
+      } catch (err) {
+        this.logger.error({ err, userId }, "Failed to wipe session directory");
+      }
+    }
   }
 
   private sleep(ms: number) {

@@ -18,6 +18,7 @@ export function WhatsAppConnector({ onConnected }: { onConnected: () => void }) 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [phone, setPhone]     = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -29,6 +30,16 @@ export function WhatsAppConnector({ onConnected }: { onConnected: () => void }) 
     };
     checkStatus();
   }, []);
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await fetch("/api/whatsapp/reset", { method: "POST" });
+    } catch {}
+    setResetting(false);
+    setStatus("idle");
+    setError(null);
+  };
 
   const startConnection = async () => {
     setStatus("connecting");
@@ -135,10 +146,19 @@ export function WhatsAppConnector({ onConnected }: { onConnected: () => void }) 
           <AlertCircle className="text-red-500" size={32} />
           <p className="text-red-700 text-sm font-medium">{error}</p>
           <button 
-            onClick={() => { setStatus("idle"); setError(null); }}
-            className="text-blue-600 font-semibold text-sm hover:underline flex items-center gap-1"
+            disabled={resetting}
+            onClick={handleReset}
+            className="text-blue-600 font-semibold text-sm hover:underline flex items-center gap-1.5 disabled:opacity-50"
           >
-            <RefreshCw size={14} /> Try Again
+            {resetting ? (
+              <>
+                <Loader2 className="animate-spin" size={14} /> Resetting...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={14} /> Reset & Try Different Number
+              </>
+            )}
           </button>
         </div>
       )}
