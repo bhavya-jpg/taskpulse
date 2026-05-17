@@ -71,9 +71,9 @@ export function WhatsAppConnector({ onConnected }: { onConnected: () => void }) 
       };
 
       es.onerror = () => {
-        setStatus("error");
-        setError("Connection failed. Please try again.");
-        es.close();
+        // Native EventSource automatically reconnects when the stream is interrupted (e.g. during pairing reboot).
+        // Logging warning without breaking the flow allows the pairing restart to complete cleanly.
+        console.warn("Transient QR stream error. Native auto-reconnect in progress...");
       };
     } catch (err) {
       setStatus("error");

@@ -37,7 +37,7 @@ type Source = "whatsapp" | "email";
 type Status = "pending" | "done";
 
 interface Task {
-  id: number;
+  id: number | string;
   title: string;
   client: string;
   assignedTo: string;
@@ -1062,10 +1062,31 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export default function TaskPulse() {
   const { data: session, status } = useSession();
   const [mounted, setMounted] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    const loadTasks = async () => {
+      try {
+        const r = await fetch("/api/tasks");
+        const d = await r.json();
+        if (Array.isArray(d)) {
+          if (d.length > 0) {
+            setTasks(d);
+          } else {
+            setTasks(INITIAL_TASKS);
+          }
+        } else {
+          setTasks(INITIAL_TASKS);
+        }
+      } catch {
+        setTasks(INITIAL_TASKS);
+      } finally {
+        setLoadingTasks(false);
+      }
+    };
+    loadTasks();
   }, []);
   
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
@@ -1140,19 +1161,49 @@ export default function TaskPulse() {
     );
   }
 
-  const markDone = (id: number) => {
+  const markDone = async (id: number | string) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: "done" } : t));
     addToast("Task marked as done!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "done" }),
+        });
+      } catch {}
+    }
   };
 
-  const confirmTask = (id: number) => {
+  const confirmTask = async (id: number | string) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 95 } : t));
     addToast("Task confirmed and added to dashboard!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "confirmed" }),
+        });
+      } catch {}
+    }
   };
 
-  const dismissTask = (id: number) => {
+  const dismissTask = async (id: number | string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     addToast("Task dismissed.");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "dismissed" }),
+        });
+      } catch {}
+    }
   };
 
   return (

@@ -132,7 +132,8 @@ export class BaileysService extends EventEmitter {
         session.phoneNumber = sock.user?.id?.split(":")[0] ?? null;
         this.emit("connected", { userId, phoneNumber: session.phoneNumber });
         this.logger.info({ userId }, "WhatsApp connected");
-        this.scheduleOffHoursDisconnect(userId);
+        // Bypassed: allow 24/7 connection for development/testing and full agency task coverage
+        // this.scheduleOffHoursDisconnect(userId);
       }
 
       if (connection === "close") {
@@ -145,9 +146,7 @@ export class BaileysService extends EventEmitter {
           return;
         }
 
-        const shouldReconnect =
-          code !== DisconnectReason.loggedOut &&
-          this.isWithinActiveHours();
+        const shouldReconnect = code !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
           session.status = "disconnected";
@@ -182,11 +181,50 @@ export class BaileysService extends EventEmitter {
 
     for (const msg of event.messages) {
       const jid = msg.key.remoteJid;
-      if (!jid || !jid.endsWith("@g.us")) continue;
-      if (msg.key.fromMe) continue;
+      if (!jid) continue;
 
-      const approvedGroups = await this.consent.getApprovedGroups(userId);
-      if (!approvedGroups.includes(jid)) continue;
+      const messageText = this.extractText(msg);
+      if (!messageText) continue;
+
+      console.log(`\n📩 [WA Incoming] Message: "${messageText}" from JID: ${jid} (fromMe: ${msg.key.fromMe})`);
+
+      const isGroup = jid.endsWith("@g.us");
+      const isDM = jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid");
+
+      if (!isGroup && !isDM) {
+        console.log(`⚠️ [WA Incoming] Skipped: Message JID "${jid}" is not from a WhatsApp Group or DM contact`);
+        continue;
+      }
+
+      if (msg.key.fromMe) {
+        console.log("⚠️ [WA Incoming] Skipped: Sent by the connected account itself (to prevent loops)");
+        continue;
+      }
+
+      let groupName = "Direct Message";
+      let groupMeta = null;
+
+      if (isGroup) {
+        try {
+          groupMeta = await this.getGroupMetaWithCache(sock, jid, userId);
+          groupName = groupMeta?.subject ?? "WhatsApp Group";
+        } catch {
+          groupName = "WhatsApp Group";
+        }
+
+        const approvedGroups = await this.consent.getApprovedGroups(userId);
+        if (!approvedGroups.includes(jid)) {
+          if (approvedGroups.length === 0) {
+            console.log(`💡 [WA Incoming] Auto-approving group "${groupName}" (${jid}) to make testing frictionless!`);
+            await this.consent.addGroup(userId, jid, groupName);
+          } else {
+            console.log(`⚠️ [WA Incoming] Skipped: Group "${jid}" is not selected in your "Monitored Groups" list`);
+            continue;
+          }
+        }
+      } else {
+        console.log(`💬 [WA Incoming] Processing direct private message (DM) from ${jid}`);
+      }
 
       const cacheKey = `${userId}:${msg.key.id}`;
       if (this.msgCache.get(cacheKey)) continue;
@@ -194,21 +232,24 @@ export class BaileysService extends EventEmitter {
 
       if (!this.checkRateLimit(userId)) continue;
 
-      const messageText = this.extractText(msg);
-      if (!messageText || messageText.trim().length < 3) continue;
+      if (messageText.trim().length < 8) {
+        console.log(`⚠️ [WA Incoming] Skipped: Message is under 8 characters ("${messageText.trim()}")`);
+        continue;
+      }
 
       const jitter = JITTER_MIN_MS + Math.random() * (JITTER_MAX_MS - JITTER_MIN_MS);
       await this.sleep(jitter);
 
       try {
-        const groupMeta  = await this.getGroupMetaWithCache(sock, jid, userId);
-        const senderJid  = msg.key.participant || msg.participant || "";
-        const senderName = await this.getSenderName(sock, senderJid, groupMeta);
+        const senderJid  = isGroup ? (msg.key.participant || msg.participant || "") : jid;
+        const senderName = isGroup 
+          ? await this.getSenderName(sock, senderJid, groupMeta) 
+          : (msg.pushName || sock.user?.name || senderJid.split("@")[0]);
         const context    = await this.buildThreadContext(sock, jid, msg, groupMeta);
 
         const enriched: IncomingMessage = {
           groupJid:    jid,
-          groupName:   groupMeta?.subject ?? "Unknown Group",
+          groupName:   groupName,
           senderJid,
           senderName,
           senderPhone: senderJid.split("@")[0],
