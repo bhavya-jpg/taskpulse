@@ -106,6 +106,8 @@ export class BaileysService extends EventEmitter {
       logger: this.logger as any,
       msgRetryCounterCache,
       retryRequestDelayMs: 2000,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
     });
 
     const session: BaileysSession = {

@@ -23,10 +23,11 @@ import {
   Briefcase,
   Inbox,
   Settings,
-  Moon,
   Sun,
+  Moon,
 } from "lucide-react";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
@@ -209,7 +210,7 @@ function TaskCard({
 }) {
   const [showSource, setShowSource] = useState(false);
   const pc = PRIORITY_CONFIG[task.priority];
-  const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" };
+  const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100 dark:bg-gray-900/40", text: "text-gray-700 dark:text-gray-300", border: "border-gray-300 dark:border-white/10" };
   const overdue = isOverdue(task.deadline) && task.status !== "done";
 
   return (
@@ -357,13 +358,13 @@ function EmptyState({ message }: { message: string }) {
 
 function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+    <div className="bg-white dark:bg-[#18181b] rounded-xl shadow-sm border border-gray-100 dark:border-white/10 p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-        <p className="text-xs text-gray-500 font-medium">{label}</p>
+        <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}</p>
       </div>
     </div>
   );
@@ -506,16 +507,16 @@ function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: num
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-1">Tasks by Client</h1>
-        <p className="text-sm text-gray-500">{tasks.filter((t) => t.status === "pending").length} pending tasks across all clients</p>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">Tasks by Client</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{tasks.filter((t) => t.status === "pending").length} pending tasks across all clients</p>
       </div>
 
       {/* Stat boxes */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatBox icon={<BarChart2 size={18} className="text-blue-600" />} label="Total Tasks" value={total} color="bg-blue-50" />
-        <StatBox icon={<AlertTriangle size={18} className="text-red-500" />} label="High Priority" value={highPriority} color="bg-red-50" />
-        <StatBox icon={<Clock size={18} className="text-orange-500" />} label="Overdue" value={overdue} color="bg-orange-50" />
-        <StatBox icon={<CheckCircle2 size={18} className="text-green-600" />} label="Completed" value={done} color="bg-green-50" />
+        <StatBox icon={<BarChart2 size={18} className="text-blue-600 dark:text-blue-400" />} label="Total Tasks" value={total} color="bg-blue-50 dark:bg-blue-950/20" />
+        <StatBox icon={<AlertTriangle size={18} className="text-red-500 dark:text-red-400" />} label="High Priority" value={highPriority} color="bg-red-50 dark:bg-red-950/20" />
+        <StatBox icon={<Clock size={18} className="text-orange-500 dark:text-orange-400" />} label="Overdue" value={overdue} color="bg-orange-50 dark:bg-orange-950/20" />
+        <StatBox icon={<CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />} label="Completed" value={done} color="bg-green-50 dark:bg-green-950/20" />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -526,7 +527,7 @@ function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: num
           const open = !collapsed[client];
 
           return (
-            <div key={client} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+            <div key={client} className="bg-white dark:bg-[#18181b] rounded-xl shadow-md overflow-hidden border border-gray-100 dark:border-white/10">
               <button
                 className={`w-full flex items-center justify-between px-5 py-4 ${cc.header} text-white`}
                 onClick={() => setCollapsed((p) => ({ ...p, [client]: !p[client] }))}
@@ -552,13 +553,13 @@ function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: num
                     <div className="px-5 pt-4 pb-2">
                       {/* Progress bar */}
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="flex-1 bg-gray-100 rounded-full h-2">
+                        <div className="flex-1 bg-gray-100 dark:bg-white/5 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full ${cc.header}`}
                             style={{ width: clientTasks.length ? `${(clientDone / clientTasks.length) * 100}%` : "0%" }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500 font-medium">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                           {clientDone}/{clientTasks.length} done
                         </span>
                       </div>
@@ -598,11 +599,11 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">Employee Task View</h1>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Employee Task View</h1>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-[#18181b] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {EMPLOYEES.map((e) => (
             <option key={e} value={e}>{e}</option>
@@ -614,19 +615,19 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
         key={selected}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-5 py-4 mb-6 flex flex-wrap gap-4"
+        className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-200 dark:border-blue-800/30 rounded-xl px-5 py-4 mb-6 flex flex-wrap gap-4"
       >
-        <span className="flex items-center gap-2 text-sm font-bold text-blue-800">
+        <span className="flex items-center gap-2 text-sm font-bold text-blue-800 dark:text-blue-300">
           <User size={16} /> {selected}
         </span>
-        <span className="text-sm text-gray-600">
-          <strong className="text-blue-700">{pending}</strong> pending tasks
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          <strong className="text-blue-700 dark:text-blue-300">{pending}</strong> pending tasks
         </span>
-        <span className="text-sm text-gray-600">
-          <strong className="text-green-700">{done}</strong> completed
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          <strong className="text-green-700 dark:text-green-400">{done}</strong> completed
         </span>
         {overdue > 0 && (
-          <span className="text-sm text-red-600 font-semibold">
+          <span className="text-sm text-red-600 dark:text-red-400 font-semibold">
             🔴 {overdue} overdue
           </span>
         )}
@@ -651,20 +652,26 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
 
 function WhatsAppView() {
   const [showSetup, setShowSetup] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [activeGroup, setActiveGroup] = useState("flipkart");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const messages = WA_MESSAGES[activeGroup] ?? [];
   const group = WA_GROUPS.find((g) => g.id === activeGroup)!;
+
+  if (!mounted) return null;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">WhatsApp Integration</h1>
-          <p className="text-sm text-gray-500">Manage your connected WhatsApp groups and task extraction.</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">WhatsApp Integration</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your connected WhatsApp groups and task extraction.</p>
         </div>
         <button 
           onClick={() => setShowSetup(!showSetup)}
-          className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors shadow-sm cursor-pointer"
         >
           <Settings size={16} />
           {showSetup ? "Back to Chat" : "Setup WhatsApp"}
@@ -673,20 +680,20 @@ function WhatsAppView() {
 
       {showSetup ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Connection</h2>
-            <WhatsAppConnector onConnected={() => {}} />
+          <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Connection</h2>
+            <WhatsAppConnector onConnected={() => setRefreshKey(k => k + 1)} />
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Monitored Groups</h2>
-            <GroupSelector />
+          <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Monitored Groups</h2>
+            <GroupSelector key={refreshKey} />
           </div>
         </div>
       ) : (
-        <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 bg-white" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
+        <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
           {/* Left panel */}
-          <div className="w-72 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
-            <div className="bg-[#075E54] text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
+          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
+            <div className="bg-[#075E54] dark:bg-[#054c44] text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
               <MessageCircle size={16} /> Groups
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -694,14 +701,14 @@ function WhatsAppView() {
                 <button
                   key={g.id}
                   onClick={() => setActiveGroup(g.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 text-left ${activeGroup === g.id ? "bg-green-50" : ""}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/5 text-left ${activeGroup === g.id ? "bg-green-50 dark:bg-green-950/20" : ""}`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     {g.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{g.name}</p>
-                    <p className="text-xs text-gray-400">{g.members} members</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{g.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{g.members} members</p>
                   </div>
                   {g.unread > 0 && (
                     <span className="bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -716,13 +723,13 @@ function WhatsAppView() {
           {/* Right panel */}
           <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5" }}>
             {/* Chat header */}
-            <div className="bg-[#075E54] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
-              <div className="w-9 h-9 rounded-full bg-green-300 flex items-center justify-center text-[#075E54] font-bold text-sm">
+            <div className="bg-[#075E54] dark:bg-[#054c44] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-green-300 dark:bg-green-700 flex items-center justify-center text-[#075E54] dark:text-white font-bold text-sm">
                 {group.name.charAt(0)}
               </div>
               <div>
                 <p className="font-semibold text-sm">{group.name}</p>
-                <p className="text-xs text-green-200">{group.members} members</p>
+                <p className="text-xs text-green-200 dark:text-green-400">{group.members} members</p>
               </div>
             </div>
 
@@ -739,18 +746,18 @@ function WhatsAppView() {
                     <div
                       className={`max-w-[70%] px-3 py-2 rounded-xl shadow-sm text-sm ${
                         msg.outgoing
-                          ? "bg-[#DCF8C6] rounded-tr-sm"
-                          : "bg-white rounded-tl-sm"
+                          ? "bg-[#DCF8C6] dark:bg-[#056162] dark:text-white rounded-tr-sm"
+                          : "bg-white dark:bg-[#202c33] dark:text-white rounded-tl-sm"
                       }`}
                     >
                       {!msg.outgoing && (
-                        <p className="text-xs font-semibold text-green-600 mb-0.5">{msg.sender}</p>
+                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-0.5">{msg.sender}</p>
                       )}
-                      <p className="text-gray-800 leading-relaxed">{msg.message}</p>
-                      <p className="text-[10px] text-gray-400 text-right mt-1">{msg.time}</p>
+                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed">{msg.message}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 text-right mt-1">{msg.time}</p>
                     </div>
                     {msg.hasTask && (
-                      <div className="mt-1 bg-blue-100 border border-blue-300 text-blue-700 text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <div className="mt-1 bg-blue-100 border border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-900/50 dark:text-blue-300 text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1">
                         🤖 Task Extracted by TaskPulse
                       </div>
                     )}
@@ -760,14 +767,14 @@ function WhatsAppView() {
             </div>
 
             {/* Input bar */}
-            <div className="bg-[#f0f0f0] border-t border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+            <div className="bg-[#f0f0f0] dark:bg-[#202c33] border-t border-gray-200 dark:border-white/5 px-4 py-3 flex items-center gap-3 flex-shrink-0">
               <input
                 type="text"
                 placeholder="Type a message (Read-only simulation)"
-                className="flex-1 bg-white rounded-full px-4 py-2 text-sm text-gray-400 italic outline-none border border-gray-200"
+                className="flex-1 bg-white dark:bg-[#2a3942] rounded-full px-4 py-2 text-sm text-gray-400 dark:text-gray-500 italic outline-none border border-gray-200 dark:border-white/5"
                 readOnly
               />
-              <button className="w-9 h-9 bg-gray-300 rounded-full flex items-center justify-center text-white cursor-not-allowed">
+              <button className="w-9 h-9 bg-gray-300 dark:bg-white/5 rounded-full flex items-center justify-center text-white cursor-not-allowed">
                 <Send size={15} />
               </button>
             </div>
@@ -788,11 +795,11 @@ function EmailView({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Mock Email Inbox</h1>
-      <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Mock Email Inbox</h1>
+      <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
         {/* Left panel */}
-        <div className="w-80 flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
-          <div className="bg-red-600 text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
+        <div className="w-80 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
+          <div className="bg-red-600 dark:bg-red-800 text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
             <Inbox size={16} /> Inbox
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -800,19 +807,19 @@ function EmailView({ onToast }: { onToast: (msg: string) => void }) {
               <button
                 key={e.id}
                 onClick={() => setSelected(e.id)}
-                className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${selected === e.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""}`}
+                className={`w-full text-left px-4 py-3 border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${selected === e.id ? "bg-blue-50 dark:bg-blue-950/20 border-l-2 border-l-blue-500" : ""}`}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <p className={`text-xs ${e.unread ? "font-bold text-gray-900" : "text-gray-500"} truncate max-w-[150px]`}>
+                  <p className={`text-xs ${e.unread ? "font-bold text-gray-900 dark:text-gray-200" : "text-gray-500 dark:text-gray-500"} truncate max-w-[150px]`}>
                     {e.from}
                   </p>
-                  <span className="text-[10px] text-gray-400 flex-shrink-0">{e.time}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">{e.time}</span>
                 </div>
-                <p className={`text-sm ${e.unread ? "font-semibold text-gray-800" : "text-gray-500"} truncate`}>
+                <p className={`text-sm ${e.unread ? "font-semibold text-gray-800 dark:text-gray-200" : "text-gray-500 dark:text-gray-500"} truncate`}>
                   {e.subject}
                 </p>
                 {e.hasTask && (
-                  <span className="mt-1 inline-flex items-center text-[10px] bg-blue-100 text-blue-700 font-semibold rounded-full px-2 py-0.5">
+                  <span className="mt-1 inline-flex items-center text-[10px] bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold rounded-full px-2 py-0.5">
                     🤖 Task Found
                   </span>
                 )}
@@ -822,56 +829,56 @@ function EmailView({ onToast }: { onToast: (msg: string) => void }) {
         </div>
 
         {/* Right panel */}
-        <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+        <div className="flex-1 flex flex-col bg-white dark:bg-[#18181b] overflow-y-auto">
           {/* Gmail-style top bar */}
-          <div className="bg-red-600 px-6 py-3 flex-shrink-0" />
+          <div className="bg-red-600 dark:bg-red-800 px-6 py-3 flex-shrink-0" />
 
           <div className="px-8 py-6 flex-1">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">{email.subject}</h2>
-            <div className="flex flex-col gap-1 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
-              <span><strong className="text-gray-700">From:</strong> {email.from}</span>
-              <span><strong className="text-gray-700">To:</strong> team@agency.com</span>
-              <span><strong className="text-gray-700">Date:</strong> {email.time}, May 2026</span>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">{email.subject}</h2>
+            <div className="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400 mb-6 pb-6 border-b border-gray-100 dark:border-white/5">
+              <span><strong className="text-gray-700 dark:text-gray-300">From:</strong> {email.from}</span>
+              <span><strong className="text-gray-700 dark:text-gray-300">To:</strong> team@agency.com</span>
+              <span><strong className="text-gray-700 dark:text-gray-300">Date:</strong> {email.time}, May 2026</span>
             </div>
 
-            <p className="text-gray-700 leading-relaxed text-sm mb-8">{email.body}</p>
+            <p className="text-gray-700 dark:text-gray-350 leading-relaxed text-sm mb-8">{email.body}</p>
 
             {email.hasTask && email.task && cc && (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-blue-50 border border-blue-200 rounded-xl p-5"
+                className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 rounded-xl p-5"
               >
-                <h3 className="font-bold text-blue-800 text-sm mb-3 flex items-center gap-2">
+                <h3 className="font-bold text-blue-800 dark:text-blue-300 text-sm mb-3 flex items-center gap-2">
                   🤖 TaskPulse Extracted Task:
                 </h3>
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
-                    <p className="text-xs text-gray-500 font-medium mb-0.5">Task</p>
-                    <p className="font-semibold text-gray-800">{email.task.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Task</p>
+                    <p className="font-semibold text-gray-800 dark:text-gray-250">{email.task.title}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium mb-0.5">Assigned To</p>
-                    <p className="font-semibold text-gray-800">{email.task.assignedTo}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Assigned To</p>
+                    <p className="font-semibold text-gray-800 dark:text-gray-250">{email.task.assignedTo}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium mb-0.5">Priority</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Priority</p>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      email.task.priority === "High" ? "bg-red-100 text-red-700" :
-                      email.task.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                      "bg-green-100 text-green-700"
+                      email.task.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" :
+                      email.task.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300" :
+                      "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
                     }`}>
                       {email.task.priority}
                     </span>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium mb-0.5">Deadline</p>
-                    <p className="font-semibold text-gray-800">{formatDate(email.task.deadline)}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Deadline</p>
+                    <p className="font-semibold text-gray-800 dark:text-gray-250">{formatDate(email.task.deadline)}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => onToast("Task added to dashboard!")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
                 >
                   ✅ Add to Dashboard
                 </button>
@@ -879,7 +886,7 @@ function EmailView({ onToast }: { onToast: (msg: string) => void }) {
             )}
 
             {!email.hasTask && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 text-center text-gray-400 text-sm">
+              <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-5 text-center text-gray-400 dark:text-gray-500 text-sm">
                 No tasks extracted from this email.
               </div>
             )}
@@ -950,9 +957,9 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
       transition={{ duration: 0.3 }}
       className="overflow-hidden"
     >
-      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5 mx-0 mb-6">
-        <h3 className="font-bold text-yellow-800 text-sm mb-3 flex items-center gap-2">
-          <Sparkles size={15} className="text-yellow-600" />
+      <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-2xl p-5 mx-0 mb-6">
+        <h3 className="font-bold text-yellow-800 dark:text-yellow-350 text-sm mb-3 flex items-center gap-2">
+          <Sparkles size={15} className="text-yellow-600 dark:text-yellow-400" />
           Demo Mode — Simulate AI Task Extraction
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
@@ -961,12 +968,12 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Paste any message here — WhatsApp or Email..."
-            className="border border-yellow-200 rounded-xl px-4 py-3 text-sm text-gray-700 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="border border-yellow-200 dark:border-yellow-900/30 rounded-xl px-4 py-3 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-[#18181b] resize-none focus:outline-none focus:ring-2 focus:ring-yellow-450 dark:focus:ring-yellow-800"
           />
           <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="border border-yellow-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="border border-yellow-200 dark:border-yellow-900/30 rounded-xl px-3 py-2.5 text-sm text-gray-700 dark:text-gray-350 bg-white dark:bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-yellow-450 dark:focus:ring-yellow-800"
           >
             <option value="whatsapp">📱 WhatsApp</option>
             <option value="email">📧 Email</option>
@@ -974,7 +981,7 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
           <select
             value={client}
             onChange={(e) => setClient(e.target.value)}
-            className="border border-yellow-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="border border-yellow-200 dark:border-yellow-900/30 rounded-xl px-3 py-2.5 text-sm text-gray-700 dark:text-gray-350 bg-white dark:bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-yellow-450 dark:focus:ring-yellow-800"
           >
             {CLIENTS.map((c) => <option key={c} value={c}>{c}</option>)}
             <option value="Unknown">Unknown</option>
@@ -982,7 +989,7 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
           <button
             onClick={extract}
             disabled={loading || !input.trim()}
-            className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white font-semibold text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 transition-colors"
+            className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white font-semibold text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 transition-colors cursor-pointer"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : "🤖"}
             Extract Task
@@ -995,41 +1002,41 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="mt-4 bg-white border border-green-200 rounded-xl overflow-hidden shadow-sm"
+              className="mt-4 bg-white dark:bg-[#18181b] border border-green-200 dark:border-green-900/30 rounded-xl overflow-hidden shadow-sm"
             >
-              <div className="bg-green-500 text-white px-4 py-2 text-sm font-bold">
+              <div className="bg-green-500 dark:bg-green-600 text-white px-4 py-2 text-sm font-bold">
                 ✅ Task Successfully Extracted!
               </div>
               <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Task</p>
-                  <p className="font-semibold text-gray-800">{result.title}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Task</p>
+                  <p className="font-semibold text-gray-800 dark:text-gray-250">{result.title}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Assigned To</p>
-                  <p className="font-semibold text-gray-800">{result.assignedTo}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Assigned To</p>
+                  <p className="font-semibold text-gray-800 dark:text-gray-250">{result.assignedTo}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Priority</p>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.priority === "High" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Priority</p>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-350"}`}>
                     {result.priority}
                   </span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Confidence</p>
-                  <p className="font-semibold text-green-700">{result.confidence}%</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Confidence</p>
+                  <p className="font-semibold text-green-700 dark:text-green-400">{result.confidence}%</p>
                 </div>
               </div>
               <div className="px-4 pb-4 flex gap-2">
                 <button
                   onClick={addToDashboard}
-                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
                 >
                   Add to Dashboard
                 </button>
                 <button
                   onClick={() => setResult(null)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                  className="bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -1053,14 +1060,18 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function TaskPulse() {
+  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [demoMode, setDemoMode] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -1090,6 +1101,44 @@ export default function TaskPulse() {
     setTasks((prev) => [mapped, ...prev]);
     addToast(`New task detected from WhatsApp: ${newTask.title}`);
   });
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <p className="text-xs text-gray-500 font-semibold animate-pulse">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
+        <div className="bg-white dark:bg-[#18181b] p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-white/10 max-w-md w-full text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500" />
+          <span className="text-4xl block mb-2">📋</span>
+          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">Welcome to TaskPulse</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto leading-relaxed">
+            Securely manage your creative agency's tasks. Extract actions from WhatsApp and Emails instantly.
+          </p>
+          <button
+            onClick={() => signIn("google")}
+            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-200 dark:shadow-none hover:shadow-lg active:scale-[0.98]"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+            </svg>
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const markDone = (id: number) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: "done" } : t));
@@ -1127,7 +1176,7 @@ export default function TaskPulse() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -1139,23 +1188,50 @@ export default function TaskPulse() {
           ))}
         </nav>
 
-        {/* Right side controls */}
-        <div className="flex items-center gap-4 min-w-[140px] justify-end">
-          {mounted && (
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+        {/* Actions container: Theme & Demo Mode */}
+        <div className="flex items-center gap-4 min-w-[260px] justify-end">
+          {/* User profile / Sign Out */}
+          {session?.user && (
+            <div className="flex items-center gap-2 bg-gray-100/50 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 rounded-xl px-2 py-1 shadow-sm">
+              {session.user.image ? (
+                <img
+                  src={session.user.image}
+                  alt={session.user.name || "User"}
+                  className="w-5 h-5 rounded-full border border-gray-200/50 dark:border-white/10"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+                  <User size={10} className="text-indigo-600 dark:text-indigo-400" />
+                </div>
+              )}
+              <button
+                onClick={() => signOut()}
+                className="text-[10px] font-extrabold text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors uppercase tracking-wider cursor-pointer"
+                title="Sign Out"
+              >
+                Sign Out
+              </button>
+            </div>
           )}
-          
-          <div className="flex items-center gap-2 border-l border-gray-200 dark:border-gray-800 pl-4">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Demo</span>
+
+          {/* Dark Mode toggle */}
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-gray-200/50 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-sm flex items-center justify-center cursor-pointer"
+            title="Toggle Theme"
+          >
+            {mounted && theme === "dark" ? (
+              <Sun size={15} className="text-yellow-500" />
+            ) : (
+              <Moon size={15} className="text-indigo-600 dark:text-indigo-400" />
+            )}
+          </button>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500">Demo Mode</span>
             <button
               onClick={() => setDemoMode((p) => !p)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${demoMode ? "bg-green-500" : "bg-gray-300 dark:bg-gray-700"}`}
+              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${demoMode ? "bg-green-500" : "bg-gray-300"}`}
             >
               <span
                 className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
