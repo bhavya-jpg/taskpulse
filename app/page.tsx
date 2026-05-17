@@ -23,8 +23,11 @@ import {
   Briefcase,
   Inbox,
   Settings,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { useTheme } from "next-themes";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -65,16 +68,16 @@ const CLIENTS = ["Flipkart", "Zomato", "Amazon", "Google"];
 const EMPLOYEES = ["Rahul", "Priya", "Admin", "Vikas"];
 
 const CLIENT_COLORS: Record<string, { bg: string; text: string; border: string; header: string }> = {
-  Flipkart: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300", header: "bg-blue-600" },
-  Zomato:   { bg: "bg-red-100",  text: "text-red-700",  border: "border-red-300",  header: "bg-red-600"  },
-  Amazon:   { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300", header: "bg-orange-500" },
-  Google:   { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-300", header: "bg-cyan-600" },
+  Flipkart: { bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-700 dark:text-blue-300", border: "border-blue-300 dark:border-blue-800", header: "bg-blue-600 dark:bg-blue-800" },
+  Zomato:   { bg: "bg-red-100 dark:bg-red-900/40",  text: "text-red-700 dark:text-red-300",  border: "border-red-300 dark:border-red-800",  header: "bg-red-600 dark:bg-red-800"  },
+  Amazon:   { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-700 dark:text-orange-300", border: "border-orange-300 dark:border-orange-800", header: "bg-orange-500 dark:bg-orange-700" },
+  Google:   { bg: "bg-cyan-100 dark:bg-cyan-900/40", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-300 dark:border-cyan-800", header: "bg-cyan-600 dark:bg-cyan-800" },
 };
 
 const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; border: string }> = {
-  High:   { dot: "bg-red-500",    text: "text-red-600",    border: "border-l-red-500"    },
-  Medium: { dot: "bg-yellow-500", text: "text-yellow-600", border: "border-l-yellow-500" },
-  Low:    { dot: "bg-green-500",  text: "text-green-600",  border: "border-l-green-500"  },
+  High:   { dot: "bg-red-500",    text: "text-red-600 dark:text-red-400",    border: "border-l-red-500 dark:border-l-red-400"    },
+  Medium: { dot: "bg-yellow-500", text: "text-yellow-600 dark:text-yellow-400", border: "border-l-yellow-500 dark:border-l-yellow-400" },
+  Low:    { dot: "bg-green-500",  text: "text-green-600 dark:text-green-400",  border: "border-l-green-500 dark:border-l-green-400"  },
 };
 
 const PRIORITY_ORDER: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
@@ -206,7 +209,7 @@ function TaskCard({
 }) {
   const [showSource, setShowSource] = useState(false);
   const pc = PRIORITY_CONFIG[task.priority];
-  const cc = CLIENT_COLORS[task.client];
+  const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" };
   const overdue = isOverdue(task.deadline) && task.status !== "done";
 
   return (
@@ -215,121 +218,122 @@ function TaskCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className={`bg-white rounded-xl shadow-md border-l-4 ${pc.border} overflow-hidden`}
+      className="bg-white dark:bg-[#18181b] rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-white/10 overflow-hidden group"
     >
-      <div className="p-4">
-        {/* Row 1: Title + Priority dot */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <p className={`font-semibold text-[15px] leading-snug text-gray-800 ${task.status === "done" ? "line-through text-gray-400" : ""}`}>
-            {task.title}
-          </p>
-          <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-            <span className={`w-2 h-2 rounded-full ${pc.dot}`} />
-            <span className={`text-xs font-semibold ${pc.text}`}>{task.priority}</span>
+      <div className="p-4 flex flex-col gap-3">
+        {/* Header: Client & Priority */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border ${cc.bg} ${cc.text} ${cc.border}`}>
+              {task.client}
+            </span>
+            <span className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md border bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 ${pc.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${pc.dot}`} />
+              {task.priority}
+            </span>
           </div>
-        </div>
-
-        {/* Row 2: Client badge + Source icon */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cc.bg} ${cc.text} ${cc.border}`}>
-            {task.client}
-          </span>
           {task.source === "whatsapp" ? (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-              <MessageCircle size={12} /> WhatsApp
-            </span>
+            <div className="bg-green-50 dark:bg-green-500/10 p-1.5 rounded-lg text-green-600 dark:text-green-400 shadow-sm border border-green-100 dark:border-green-500/20" title="Source: WhatsApp">
+              <MessageCircle size={14} />
+            </div>
           ) : (
-            <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-              <Mail size={12} /> Email
-            </span>
+            <div className="bg-blue-50 dark:bg-blue-500/10 p-1.5 rounded-lg text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-500/20" title="Source: Email">
+              <Mail size={14} />
+            </div>
           )}
-          <span className="ml-auto text-xs text-gray-400 bg-gray-50 rounded px-1.5 py-0.5">
-            {task.confidence}% confidence
+        </div>
+
+        {/* Title */}
+        <h4 className={`font-semibold text-[14px] leading-snug text-gray-800 dark:text-gray-100 ${task.status === "done" ? "line-through text-gray-400 dark:text-gray-600" : ""}`}>
+          {task.title}
+        </h4>
+
+        {/* Info row: Assignee & Date */}
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
+              <User size={10} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar size={12} className={overdue ? "text-red-500 dark:text-red-400" : ""} />
+            <span className={overdue ? "text-red-600 dark:text-red-400 font-bold" : "font-medium"}>
+              {formatDate(task.deadline)}
+            </span>
+          </div>
+        </div>
+
+        {/* Source Group Context */}
+        <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50/80 dark:bg-white/5 px-2 py-1.5 rounded-lg border border-gray-100 dark:border-white/5 font-medium">
+          <span className="whitespace-normal break-words">
+            {showFrom ? `📍 From: ${task.sourceGroup}` : `📁 ${task.sourceGroup}`}
           </span>
         </div>
 
-        {/* Row 3: Assigned + Due */}
-        <div className="flex items-center gap-4 mb-2 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><User size={11} /> {task.assignedTo}</span>
-          <span className="flex items-center gap-1"><Calendar size={11} /> Due {formatDate(task.deadline)}</span>
-        </div>
-
-        {/* Row 4: Overdue banner */}
-        {overdue && (
-          <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded px-2 py-1 mb-2">
-            🔴 OVERDUE
-          </div>
-        )}
-
-        {/* Row 5: Source group */}
-        {showFrom && (
-          <p className="text-xs text-gray-400 mb-2">
-            📍 From: {task.sourceGroup} ({task.source === "whatsapp" ? "WhatsApp" : "Email"})
-          </p>
-        )}
-        {!showFrom && (
-          <p className="text-xs text-gray-400 mb-2">
-            📁 {task.sourceGroup}
-          </p>
-        )}
-
-        {/* Confidence warning (unconfirmed) */}
+        {/* Confidence / Action needed */}
         {showConfirmButtons && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mb-3 text-xs text-yellow-700 font-medium">
-            ⚠️ AI confidence: {task.confidence}% — Please confirm
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-2 text-[11px] text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5 shadow-sm mt-1">
+            <Sparkles size={12} className="text-amber-500 dark:text-amber-400" />
+            AI Confidence: {task.confidence}%
           </div>
         )}
 
         {/* View source message */}
-        <button
-          onClick={() => setShowSource((p) => !p)}
-          className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-medium mb-2 transition-colors"
-        >
-          {showSource ? <EyeOff size={12} /> : <Eye size={12} />}
-          {showSource ? "Hide" : "👁 View"} Source Message
-        </button>
+        <div className="border-t border-gray-100 dark:border-white/10 pt-3 mt-1">
+          <button
+            onClick={() => setShowSource((p) => !p)}
+            className="flex items-center justify-between w-full text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              {showSource ? <EyeOff size={13} /> : <Eye size={13} />}
+              {showSource ? "Hide message source" : "View message source"}
+            </span>
+            <ChevronDown size={13} className={`transform transition-transform ${showSource ? "rotate-180" : ""}`} />
+          </button>
 
-        <AnimatePresence>
-          {showSource && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <blockquote className="bg-gray-50 border-l-4 border-gray-300 rounded-r-lg px-3 py-2 text-xs text-gray-600 italic mb-2">
-                &ldquo;{task.sourceMessage}&rdquo;
-              </blockquote>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <AnimatePresence>
+            {showSource && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-[#f8fafc] dark:bg-black/40 border border-gray-200 dark:border-white/5 rounded-lg p-3 text-[12px] text-gray-700 dark:text-gray-300 relative shadow-inner">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-300 dark:bg-indigo-700 rounded-l-lg" />
+                  <p className="whitespace-normal leading-relaxed break-words font-medium">
+                    "{task.sourceMessage}"
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 pt-1">
           {showConfirmButtons ? (
             <>
               <button
                 onClick={() => onConfirm?.(task.id)}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-200 dark:shadow-none"
               >
-                ✅ Yes, Add It
+                <CheckCircle2 size={14} /> Accept
               </button>
               <button
                 onClick={() => onDismiss?.(task.id)}
-                className="flex-1 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors border border-gray-200"
+                className="flex-1 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[12px] font-bold rounded-lg py-2 transition-all border border-gray-200 dark:border-white/10 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm"
               >
-                ❌ Dismiss
-              </button>
-              <button className="bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors border border-gray-200">
-                ✏️ Edit
+                <X size={14} /> Reject
               </button>
             </>
           ) : task.status === "pending" ? (
             <button
               onClick={() => onMarkDone?.(task.id)}
-              className="bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors border border-green-200"
+              className="w-full bg-white dark:bg-white/5 hover:bg-green-50 dark:hover:bg-green-500/10 text-gray-600 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 text-[12px] font-bold rounded-lg py-2 transition-all border border-gray-200 dark:border-white/10 dark:hover:border-green-500/30 flex items-center justify-center gap-1.5 group-hover:border-green-200 dark:group-hover:border-green-500/20 shadow-sm"
             >
-              ✅ Mark Done
+              <CheckCircle2 size={14} className="text-green-600 dark:text-green-500 group-hover:scale-110 transition-transform" /> Mark as Done
             </button>
           ) : null}
         </div>
@@ -342,9 +346,9 @@ function TaskCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <span className="text-4xl mb-3">🎉</span>
-      <p className="text-gray-400 text-sm font-medium">{message}</p>
+    <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-white dark:bg-white/5 rounded-xl border border-dashed border-gray-300 dark:border-white/10 shadow-sm">
+      <span className="text-3xl mb-2 grayscale opacity-50 dark:opacity-30">👻</span>
+      <p className="text-gray-500 dark:text-gray-400 text-[13px] font-semibold">{message}</p>
     </div>
   );
 }
@@ -388,68 +392,101 @@ function DashboardView({
     return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
   });
 
-  const totalToday = tasks.length;
-  const doneToday = done.length;
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Column 1 */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">📋 All Tasks</h2>
-          <span className="bg-blue-600 text-white text-xs font-bold rounded-full px-2 py-0.5">{sorted.length}</span>
-        </div>
-        <div className="flex flex-col gap-3">
-          <AnimatePresence>
-            {sorted.length === 0 ? (
-              <EmptyState message="No tasks here yet 🎉" />
-            ) : (
-              sorted.map((t) => (
-                <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
-              ))
-            )}
-          </AnimatePresence>
+    <div className="flex flex-col gap-8">
+      {/* Onboarding / Context Banner */}
+      <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 dark:from-indigo-950 dark:via-purple-900/40 dark:to-indigo-900/60 rounded-2xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border dark:border-white/5">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+        <div className="relative z-10 w-full">
+          <h2 className="text-2xl font-bold mb-3 flex items-center gap-2">
+            <Sparkles size={24} className="text-yellow-300 animate-pulse" />
+            Your AI Task Kanban Board
+          </h2>
+          <p className="text-indigo-100 dark:text-indigo-200/80 text-sm md:text-base max-w-3xl leading-relaxed">
+            Welcome to the new professional dashboard. AI extracts tasks from WhatsApp & Emails automatically. 
+            Review unconfirmed tasks in the first column, manage your active to-dos in the center, and track your wins on the right.
+          </p>
         </div>
       </div>
 
-      {/* Column 2 */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">⚠️ Unconfirmed</h2>
-          <span className="bg-yellow-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{unconfirmed.length}</span>
+      {/* Kanban Board */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Column 1: AI Suggestions / Needs Review */}
+        <div className="bg-gray-100/60 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-4 border border-gray-200 dark:border-white/10 shadow-inner min-h-[500px]">
+          <div className="flex flex-col gap-1 px-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
+                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-[16px]">Needs Review</h3>
+              </div>
+              <span className="bg-white dark:bg-black/40 text-gray-700 dark:text-gray-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-gray-200 dark:border-white/10 shadow-sm">{unconfirmed.length}</span>
+            </div>
+            <p className="text-[12px] text-gray-500 dark:text-gray-400 font-medium">AI found these tasks. Please confirm.</p>
+          </div>
+          
+          <div className="flex flex-col gap-3">
+            <AnimatePresence>
+              {unconfirmed.length === 0 ? (
+                <EmptyState message="No tasks to review 🎉" />
+              ) : (
+                unconfirmed.map((t) => (
+                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} />
+                ))
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-        <div className="flex flex-col gap-3">
-          <AnimatePresence>
-            {unconfirmed.length === 0 ? (
-              <EmptyState message="No unconfirmed tasks 🎉" />
-            ) : (
-              unconfirmed.map((t) => (
-                <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} />
-              ))
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
 
-      {/* Column 3 */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">✅ Completed</h2>
-          <span className="bg-green-600 text-white text-xs font-bold rounded-full px-2 py-0.5">{done.length}</span>
+        {/* Column 2: To Do / Active Tasks */}
+        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl p-4 flex flex-col gap-4 border border-indigo-100 dark:border-indigo-900/30 shadow-inner min-h-[500px]">
+          <div className="flex flex-col gap-1 px-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm" />
+                <h3 className="font-bold text-gray-800 dark:text-indigo-100 text-[16px]">Active Tasks</h3>
+              </div>
+              <span className="bg-white dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-indigo-200 dark:border-indigo-800/50 shadow-sm">{sorted.length}</span>
+            </div>
+            <p className="text-[12px] text-gray-500 dark:text-indigo-200/60 font-medium">Confirmed tasks ready to be worked on.</p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <AnimatePresence>
+              {sorted.length === 0 ? (
+                <EmptyState message="All caught up! 🎉" />
+              ) : (
+                sorted.map((t) => (
+                  <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
+                ))
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-        <div className="bg-green-50 rounded-xl border border-green-200 px-4 py-2 mb-3 text-sm text-green-700 font-semibold">
-          {doneToday} of {totalToday} tasks done today
-        </div>
-        <div className="flex flex-col gap-3">
-          <AnimatePresence>
-            {done.length === 0 ? (
-              <EmptyState message="No completed tasks yet" />
-            ) : (
-              done.map((t) => (
-                <TaskCard key={t.id} task={t} />
-              ))
-            )}
-          </AnimatePresence>
+
+        {/* Column 3: Completed */}
+        <div className="bg-green-50/40 dark:bg-emerald-950/20 rounded-2xl p-4 flex flex-col gap-4 border border-green-100 dark:border-emerald-900/30 shadow-inner min-h-[500px]">
+          <div className="flex flex-col gap-1 px-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm" />
+                <h3 className="font-bold text-gray-800 dark:text-emerald-100 text-[16px]">Completed</h3>
+              </div>
+              <span className="bg-white dark:bg-emerald-950/40 text-green-700 dark:text-emerald-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-green-200 dark:border-emerald-800/50 shadow-sm">{done.length}</span>
+            </div>
+            <p className="text-[12px] text-gray-500 dark:text-emerald-200/60 font-medium">Tasks finished successfully.</p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <AnimatePresence>
+              {done.length === 0 ? (
+                <EmptyState message="No tasks done yet" />
+              ) : (
+                done.map((t) => (
+                  <TaskCard key={t.id} task={t} />
+                ))
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>
@@ -1020,6 +1057,10 @@ export default function TaskPulse() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [demoMode, setDemoMode] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -1066,14 +1107,14 @@ export default function TaskPulse() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
 
       {/* NAVBAR */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100 h-[60px] flex items-center px-6">
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-black/50 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-gray-800 h-[60px] flex items-center px-6 transition-colors duration-300">
         <div className="flex items-center gap-2 min-w-[160px]">
           <span className="text-xl">📋</span>
-          <span className="font-extrabold text-gray-900 text-lg tracking-tight">TaskPulse</span>
+          <span className="font-extrabold text-gray-900 dark:text-white text-lg tracking-tight">TaskPulse</span>
         </div>
 
         <div className="flex items-center ml-4">
@@ -1088,8 +1129,8 @@ export default function TaskPulse() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               {tab.icon}
@@ -1098,17 +1139,29 @@ export default function TaskPulse() {
           ))}
         </nav>
 
-        {/* Demo Mode toggle */}
-        <div className="flex items-center gap-2 min-w-[140px] justify-end">
-          <span className="text-xs font-semibold text-gray-500">Demo Mode</span>
-          <button
-            onClick={() => setDemoMode((p) => !p)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${demoMode ? "bg-green-500" : "bg-gray-300"}`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
-            />
-          </button>
+        {/* Right side controls */}
+        <div className="flex items-center gap-4 min-w-[140px] justify-end">
+          {mounted && (
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          )}
+          
+          <div className="flex items-center gap-2 border-l border-gray-200 dark:border-gray-800 pl-4">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Demo</span>
+            <button
+              onClick={() => setDemoMode((p) => !p)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${demoMode ? "bg-green-500" : "bg-gray-300 dark:bg-gray-700"}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </div>
         </div>
       </header>
 
