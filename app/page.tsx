@@ -19,6 +19,7 @@ import {
   Sparkles,
   Loader2,
   BarChart2,
+  Video,
   Users,
   Briefcase,
   Inbox,
@@ -27,13 +28,14 @@ import {
   Moon,
 } from "lucide-react";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { MeetingTab } from "@/components/MeetingTab";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "whatsapp" | "email";
+type Source = "whatsapp" | "email" | "zoom" | "google_meet";
 type Status = "pending" | "done";
 
 interface Task {
@@ -50,7 +52,7 @@ interface Task {
   sourceMessage: string;
 }
 
-type Tab = "dashboard" | "client" | "employee" | "whatsapp" | "email";
+type Tab = "dashboard" | "client" | "employee" | "whatsapp" | "email" | "meetings";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 
@@ -1094,6 +1096,7 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard",     icon: <BarChart2 size={15} /> },
+  { id: "meetings",  label: "Meetings",      icon: <Video size={15} /> },
   { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
   { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
   { id: "whatsapp",  label: "Mock WhatsApp", icon: <MessageCircle size={15} /> },
@@ -1359,6 +1362,7 @@ export default function TaskPulse() {
                 onDismiss={dismissTask}
               />
             )}
+            {activeTab === "meetings" && <MeetingTab />}
             {activeTab === "client" && (
               <ClientView tasks={tasks} onMarkDone={markDone} />
             )}
