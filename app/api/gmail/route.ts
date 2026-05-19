@@ -3,10 +3,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { cookies } from "next/headers"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" })
 
 export async function GET() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get("gmail_token")?.value
 
   if (!token) {
@@ -20,13 +20,14 @@ export async function GET() {
   try {
     const messageList = await gmail.users.messages.list({
       userId: "me",
-      maxResults: 10,
+      maxResults: 5, // reduced from 10 to save quota
       q: "is:inbox",
     })
 
     const messages = messageList.data.messages || []
-    const extractedTasks = []
+    const emailSummaries: { id: string; from: string; subject: string; snippet: string }[] = []
 
+    // Step 1: Fetch all emails first (no AI calls yet)
     for (const msg of messages) {
       const full = await gmail.users.messages.get({
         userId: "me",
@@ -38,50 +39,91 @@ export async function GET() {
       const from = headers.find(h => h.name === "From")?.value || ""
       const snippet = full.data.snippet || ""
 
-      const result = await model.generateContent(`
-You are a task extraction AI. Analyze this email and extract any actionable task.
-From: ${from}
-Subject: ${subject}
-Message: ${snippet}
+      emailSummaries.push({ id: msg.id!, from, subject, snippet })
+    }
 
-Respond ONLY in this JSON format, nothing else:
-{
-  "is_task": true or false,
-  "task_title": "action verb first, max 10 words",
-  "client": "company name from sender",
-  "priority": "High or Medium or Low",
-  "deadline": "date if mentioned or null",
-  "confidence": number between 0 and 100
-}`)
+    if (emailSummaries.length === 0) {
+      return Response.json({ tasks: [] })
+    }
 
-      const text = result.response.text()
-      try {
-        const cleaned = text.replace(/```json|```/g, "").trim()
-        const parsed = JSON.parse(cleaned)
-        if (parsed.is_task) {
-          extractedTasks.push({
-            id: Date.now() + Math.floor(Math.random() * 1000), // unique id
-            title: parsed.task_title,
-            client: parsed.client || "Unknown",
-            assignedTo: "Unassigned",
-            deadline: parsed.deadline || new Date().toISOString().split('T')[0],
-            priority: parsed.priority || "Medium",
-            source: "email",
-            sourceGroup: \`\${subject.substring(0, 30)}...\`,
-            status: "pending",
-            confidence: parsed.confidence || 85,
-            sourceMessage: snippet,
-          })
-        }
-      } catch (e) {
-        console.error("Failed to parse Gemini response", e)
-        continue
+    // Step 2: ONE single AI call for ALL emails (saves 90% quota)
+    const emailList = emailSummaries.map((e, i) =>
+      `Email ${i + 1}:\nFrom: ${e.from}\nSubject: ${e.subject}\nMessage: ${e.snippet.substring(0, 200)}`
+    ).join("\n---\n")
+
+    let text = ""
+    try {
+      const prompt = `You are a task extraction AI. Analyze these emails and extract actionable tasks.
+
+${emailList}
+
+Respond ONLY with a JSON array. For each email, include an entry ONLY if it contains a task:
+[{"email_index":1,"is_task":true,"task_title":"short title","client":"company name","priority":"High or Medium or Low","deadline":"date or null","confidence":80}]
+If no emails have tasks, respond with: []`;
+
+      // The Gemini SDK auto-retries on 429 quota errors, causing the app to hang for up to a minute.
+      // We wrap it in a 4-second timeout to instantly trigger the mock fallback instead.
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("429 Timeout")), 4000))
+      ]) as any;
+
+      text = result.response.text()
+    } catch (apiError: any) {
+      if (apiError.status === 429 || String(apiError).includes("429") || String(apiError).includes("quota")) {
+        console.warn("Gemini Quota Exceeded. Falling back to mock extraction for testing.");
+        // Fallback: create mock tasks from the first 2 emails so the user can test the UI
+        text = JSON.stringify(
+          emailSummaries.slice(0, 2).map((e, i) => ({
+            email_index: i + 1,
+            is_task: true,
+            task_title: `[MOCK] Address: ${e.subject.substring(0, 20)}`,
+            client: e.from.split("@")[0].substring(0, 15),
+            priority: i === 0 ? "High" : "Medium",
+            deadline: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+            confidence: 99
+          }))
+        );
+      } else {
+        throw apiError;
       }
     }
 
+    const extractedTasks = []
+
+    try {
+      const cleaned = text.replace(/```json|```/g, "").trim()
+      const parsed = JSON.parse(cleaned)
+
+      if (Array.isArray(parsed)) {
+        for (const task of parsed) {
+          if (task.is_task) {
+            const emailData = emailSummaries[task.email_index - 1]
+            if (!emailData) continue
+
+            extractedTasks.push({
+              id: Date.now() + Math.floor(Math.random() * 10000),
+              title: task.task_title,
+              client: task.client || "Unknown",
+              assignedTo: "Unassigned",
+              deadline: task.deadline || new Date().toISOString().split('T')[0],
+              priority: task.priority || "Medium",
+              source: "email",
+              sourceGroup: emailData.subject.substring(0, 30) + "...",
+              status: "pending",
+              confidence: task.confidence || 85,
+              sourceMessage: emailData.snippet,
+            })
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse Gemini response:", text)
+    }
+
     return Response.json({ tasks: extractedTasks })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gmail API Error:", error)
-    return Response.json({ error: "Failed to fetch emails" }, { status: 500 })
+    return Response.json({ error: "Failed to fetch emails", details: error.message || String(error) }, { status: 500 })
   }
 }

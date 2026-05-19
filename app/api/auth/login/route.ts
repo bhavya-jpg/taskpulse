@@ -8,7 +8,10 @@ export async function GET() {
   )
   
   const url = oauth2Client.generateAuthUrl({
-    scope: ["https://www.googleapis.com/auth/gmail.readonly"],
+    scope: [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/userinfo.email"
+    ],
     access_type: "offline",
   })
   

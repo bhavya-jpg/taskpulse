@@ -790,6 +790,25 @@ function WhatsAppView() {
 function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) {
   const [selected, setSelected] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+
+  // Check if Gmail is connected on mount
+  useEffect(() => {
+    const emailCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("gmail_email="));
+    if (emailCookie) {
+      const email = decodeURIComponent(emailCookie.split("=")[1]);
+      if (email) setConnectedEmail(email);
+    }
+  }, []);
+
+  const disconnectGmail = () => {
+    document.cookie = "gmail_token=; Path=/; Max-Age=0";
+    document.cookie = "gmail_email=; Path=/; Max-Age=0";
+    setConnectedEmail(null);
+    onToast("Gmail disconnected.");
+  };
 
   const fetchRealEmails = async () => {
     setLoading(true);
@@ -805,7 +824,7 @@ function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setT
         setTasks(prev => [...data.tasks, ...prev]);
         onToast(`Successfully extracted ${data.tasks.length} tasks from real Gmail!`);
       } else if (data.error) {
-        onToast(`Error: ${data.error}`);
+        onToast(`Error: ${data.error}. ${data.details || ""}`);
       }
     } catch (e) {
       onToast("Failed to fetch emails.");
@@ -819,22 +838,46 @@ function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setT
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Email Integration</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Email Integration</h1>
+          {connectedEmail ? (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Connected: <strong className="text-gray-800 dark:text-gray-200">{connectedEmail}</strong>
+              </span>
+              <button
+                onClick={disconnectGmail}
+                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2 underline cursor-pointer"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
+              Not connected
+            </p>
+          )}
+        </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => window.location.href = "/api/auth/login"}
-            className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm"
-          >
-            📧 Connect Gmail
-          </button>
-          <button
-            onClick={fetchRealEmails}
-            disabled={loading}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : "📨"}
-            {loading ? "🤖 AI Reading Emails..." : "Fetch Real Emails"}
-          </button>
+          {!connectedEmail ? (
+            <button
+              onClick={() => window.location.href = "/api/auth/login"}
+              className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm"
+            >
+              📧 Connect Gmail
+            </button>
+          ) : (
+            <button
+              onClick={fetchRealEmails}
+              disabled={loading}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : "📨"}
+              {loading ? "🤖 AI Reading Emails..." : "Fetch Real Emails"}
+            </button>
+          )}
         </div>
       </div>
       <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
