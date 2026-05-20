@@ -11,7 +11,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'TaskPulse — AI-Powered Task Management',
   description: 'AI-powered task management platform for creative agencies. Automatically extract tasks from WhatsApp and email.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
