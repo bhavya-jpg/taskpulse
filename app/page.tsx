@@ -25,15 +25,16 @@ import {
   Settings,
   Sun,
   Moon,
+  Hash,
 } from "lucide-react";
-import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "whatsapp" | "email";
+type Source = "whatsapp" | "email" | "slack";
 type Status = "pending" | "done";
 
 interface Task {
@@ -50,7 +51,7 @@ interface Task {
   sourceMessage: string;
 }
 
-type Tab = "dashboard" | "client" | "employee" | "whatsapp" | "email";
+type Tab = "dashboard" | "client" | "employee" | "slack" | "email";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 
@@ -59,63 +60,29 @@ const INITIAL_TASKS: Task[] = [
   { id: 2, title: "Finalize proposal document for Zomato", client: "Zomato", assignedTo: "Priya", deadline: "2026-05-19", priority: "High", source: "email", sourceGroup: "Zomato Strategy Thread", status: "pending", confidence: 88, sourceMessage: "Hi team, we need the proposal finalized by tomorrow EOD. Please review the attached doc and send it across." },
   { id: 3, title: "Update social media posts for Amazon", client: "Amazon", assignedTo: "Priya", deadline: "2026-05-17", priority: "Medium", source: "whatsapp", sourceGroup: "Amazon Social Media Group", status: "pending", confidence: 72, sourceMessage: "Dekha jayega if we can push the posts out by tomorrow? Client ka pressure hai bhai." },
   { id: 4, title: "Send May invoice to Flipkart", client: "Flipkart", assignedTo: "Admin", deadline: "2026-05-20", priority: "Medium", source: "email", sourceGroup: "Finance Thread", status: "done", confidence: 92, sourceMessage: "Please send the May invoice to Flipkart by end of week. Accounts team is waiting." },
-  { id: 5, title: "Design banner for Google Ads campaign", client: "Google", assignedTo: "Rahul", deadline: "2026-05-17", priority: "High", source: "whatsapp", sourceGroup: "Google Ads Campaign Group", status: "pending", confidence: 91, sourceMessage: "@Rahul please design the banner for the Google Ads campaign by tomorrow morning. Client review is at 11 AM." },
+  { id: 5, title: "Design banner for Google Ads campaign", client: "Google", assignedTo: "Rahul", deadline: "2026-05-17", priority: "High", source: "slack", sourceGroup: "#google-campaigns", status: "pending", confidence: 91, sourceMessage: "@Rahul please design the banner for the Google Ads campaign by tomorrow morning. Client review is at 11 AM." },
   { id: 6, title: "Schedule Q2 strategy meeting with Zomato", client: "Zomato", assignedTo: "Priya", deadline: "2026-05-16", priority: "High", source: "email", sourceGroup: "Zomato Comms", status: "pending", confidence: 87, sourceMessage: "Can we schedule a meeting with the Zomato team this Friday to discuss Q2 strategy? Please confirm availability." },
   { id: 7, title: "Send performance report to Amazon", client: "Amazon", assignedTo: "Vikas", deadline: "2026-05-21", priority: "Low", source: "email", sourceGroup: "Amazon Monthly Reports", status: "pending", confidence: 83, sourceMessage: "Vikas, please compile and send the monthly performance report for the Amazon account by next Tuesday." },
-  { id: 8, title: "Prepare pitch deck for new Google campaign", client: "Google", assignedTo: "Rahul", deadline: "2026-05-22", priority: "Medium", source: "whatsapp", sourceGroup: "Google Strategy", status: "pending", confidence: 76, sourceMessage: "Bhai kal tak ek rough pitch deck banana hai Google ke naye campaign ke liye. Founder ko dikhana hai." },
+  { id: 8, title: "Prepare pitch deck for new Google campaign", client: "Google", assignedTo: "Rahul", deadline: "2026-05-22", priority: "Medium", source: "slack", sourceGroup: "#google-strategy", status: "pending", confidence: 76, sourceMessage: "Bhai kal tak ek rough pitch deck banana hai Google ke naye campaign ke liye. Founder ko dikhana hai." },
 ];
 
 const CLIENTS = ["Flipkart", "Zomato", "Amazon", "Google"];
 const EMPLOYEES = ["Rahul", "Priya", "Admin", "Vikas"];
 
 const CLIENT_COLORS: Record<string, { bg: string; text: string; border: string; header: string }> = {
-  Flipkart: { bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-700 dark:text-blue-300", border: "border-blue-300 dark:border-blue-800", header: "bg-blue-600 dark:bg-blue-800" },
-  Zomato:   { bg: "bg-red-100 dark:bg-red-900/40",  text: "text-red-700 dark:text-red-300",  border: "border-red-300 dark:border-red-800",  header: "bg-red-600 dark:bg-red-800"  },
-  Amazon:   { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-700 dark:text-orange-300", border: "border-orange-300 dark:border-orange-800", header: "bg-orange-500 dark:bg-orange-700" },
-  Google:   { bg: "bg-cyan-100 dark:bg-cyan-900/40", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-300 dark:border-cyan-800", header: "bg-cyan-600 dark:bg-cyan-800" },
+  Flipkart: { bg: "bg-blue-50/80 dark:bg-blue-950/20", text: "text-blue-600 dark:text-blue-400", border: "border-blue-200 dark:border-blue-900/40", header: "bg-blue-600 dark:bg-blue-800" },
+  Zomato:   { bg: "bg-rose-50/80 dark:bg-rose-950/20",  text: "text-rose-600 dark:text-rose-400",  border: "border-rose-200 dark:border-rose-900/40",  header: "bg-rose-600 dark:bg-rose-800"  },
+  Amazon:   { bg: "bg-amber-50/80 dark:bg-amber-950/20", text: "text-amber-600 dark:text-amber-400", border: "border-amber-200 dark:border-amber-900/40", header: "bg-amber-500 dark:bg-amber-700" },
+  Google:   { bg: "bg-emerald-50/80 dark:bg-emerald-950/20", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-200 dark:border-emerald-900/40", header: "bg-emerald-600 dark:bg-emerald-800" },
 };
 
-const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; border: string }> = {
-  High:   { dot: "bg-red-500",    text: "text-red-600 dark:text-red-400",    border: "border-l-red-500 dark:border-l-red-400"    },
-  Medium: { dot: "bg-yellow-500", text: "text-yellow-600 dark:text-yellow-400", border: "border-l-yellow-500 dark:border-l-yellow-400" },
-  Low:    { dot: "bg-green-500",  text: "text-green-600 dark:text-green-400",  border: "border-l-green-500 dark:border-l-green-400"  },
+const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; bg: string; border: string }> = {
+  High:   { dot: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse", text: "text-red-700 dark:text-red-400", bg: "bg-red-50/50 dark:bg-red-950/10", border: "border-red-200/60 dark:border-red-900/30" },
+  Medium: { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50/50 dark:bg-amber-950/10", border: "border-amber-200/60 dark:border-amber-900/30" },
+  Low:    { dot: "bg-sky-500", text: "text-sky-700 dark:text-sky-400", bg: "bg-sky-50/50 dark:bg-sky-950/10", border: "border-sky-200/60 dark:border-sky-900/30" },
 };
 
 const PRIORITY_ORDER: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
-
-// ─── WHATSAPP DATA ────────────────────────────────────────────────────────────
-
-const WA_GROUPS = [
-  { id: "flipkart", name: "Flipkart Campaign Group", members: 8, unread: 3 },
-  { id: "amazon",   name: "Amazon Social Media Group", members: 5, unread: 1 },
-  { id: "google",   name: "Google Ads Campaign Group", members: 6, unread: 2 },
-  { id: "zomato",   name: "Zomato Strategy Group",     members: 4, unread: 1 },
-];
-
-const WA_MESSAGES: Record<string, { sender: string; time: string; message: string; hasTask: boolean; outgoing?: boolean }[]> = {
-  flipkart: [
-    { sender: "Ankit (Client)", time: "10:02 AM", message: "Hi team, hope you're doing well!", hasTask: false },
-    { sender: "Ankit (Client)", time: "10:05 AM", message: "Can someone send the revised creatives before 6 PM today? The client is waiting. This is urgent.", hasTask: true },
-    { sender: "Rahul", time: "10:07 AM", message: "Sure Ankit bhai, will send it by 5:30 PM!", hasTask: false, outgoing: true },
-    { sender: "Priya", time: "10:08 AM", message: "👍", hasTask: false, outgoing: true },
-    { sender: "Manager", time: "11:00 AM", message: "@Rahul please also prepare the brief document by tomorrow morning.", hasTask: true },
-  ],
-  amazon: [
-    { sender: "Amazon Team", time: "9:00 AM", message: "Good morning everyone!", hasTask: false },
-    { sender: "Amazon Team", time: "9:15 AM", message: "Dekha jayega if we can push the posts out by tomorrow? Client ka pressure hai bhai.", hasTask: true },
-    { sender: "Priya", time: "9:20 AM", message: "Sure, I'll handle it.", hasTask: false, outgoing: true },
-  ],
-  google: [
-    { sender: "Client (Google)", time: "9:30 AM", message: "Good morning team!", hasTask: false },
-    { sender: "Client (Google)", time: "9:32 AM", message: "@Rahul please design the banner for the Google Ads campaign by tomorrow morning. Client review is at 11 AM.", hasTask: true },
-    { sender: "Rahul", time: "9:35 AM", message: "On it! Will share by tonight.", hasTask: false, outgoing: true },
-  ],
-  zomato: [
-    { sender: "Zomato Partnerships", time: "8:45 AM", message: "Hi team! Quick update needed.", hasTask: false },
-    { sender: "Zomato Partnerships", time: "8:50 AM", message: "Can we schedule a meeting this Friday for Q2 strategy? Please confirm availability.", hasTask: true },
-    { sender: "Priya", time: "9:00 AM", message: "Friday works for us!", hasTask: false, outgoing: true },
-  ],
-};
 
 // ─── EMAIL DATA ───────────────────────────────────────────────────────────────
 
@@ -140,7 +107,7 @@ const EMAILS = [
   },
   {
     id: 4, from: "noreply@google.com", subject: "Campaign Brief Required", time: "Mon",
-    hasTask: true, unread: false, client: "Google",
+    hasTask: true, unread: false, client: null,
     body: "Hello, we need the campaign brief and creative assets for the upcoming Q3 Google Ads campaign. Please send the brief document by end of this week. Thank you.",
     task: { title: "Prepare pitch deck for new Google campaign", assignedTo: "Rahul", priority: "Medium", deadline: "2026-05-22" },
   },
@@ -202,9 +169,9 @@ function TaskCard({
   showFrom = false,
 }: {
   task: Task;
-  onMarkDone?: (id: number) => void;
-  onConfirm?: (id: number) => void;
-  onDismiss?: (id: number) => void;
+  onMarkDone?: (id: number | string) => void;
+  onConfirm?: (id: number | string) => void;
+  onDismiss?: (id: number | string) => void;
   showConfirmButtons?: boolean;
   showFrom?: boolean;
 }) {
@@ -219,28 +186,37 @@ function TaskCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className="bg-white dark:bg-[#18181b] rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-white/10 overflow-hidden group"
+      className="bg-white dark:bg-[#121214] rounded-xl shadow-sm hover:shadow-md border border-gray-200/60 dark:border-white/5 hover:border-indigo-500/20 dark:hover:border-indigo-500/20 hover:scale-[1.01] transition-all duration-300 overflow-hidden group"
     >
       <div className="p-4 flex flex-col gap-3">
-        {/* Header: Client & Priority */}
+        {/* Header: Client, Priority & Custom Platform Badges */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md border ${cc.bg} ${cc.text} ${cc.border}`}>
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${cc.bg} ${cc.text} ${cc.border}`}>
               {task.client}
             </span>
-            <span className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md border bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 ${pc.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${pc.dot}`} />
+            <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${pc.bg} ${pc.border} ${pc.text}`}>
+              <span className={`w-1 h-1 rounded-full ${pc.dot}`} />
               {task.priority}
             </span>
           </div>
-          {task.source === "whatsapp" ? (
-            <div className="bg-green-50 dark:bg-green-500/10 p-1.5 rounded-lg text-green-600 dark:text-green-400 shadow-sm border border-green-100 dark:border-green-500/20" title="Source: WhatsApp">
-              <MessageCircle size={14} />
-            </div>
+          
+          {/* Custom Source platform badges */}
+          {task.source === "slack" ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-purple-50/50 dark:bg-purple-950/15 border-purple-200/50 dark:border-purple-900/35 text-purple-700 dark:text-purple-400 shadow-sm">
+              <MessageCircle size={10} className="rotate-90 text-purple-500" />
+              Slack
+            </span>
+          ) : task.source === "email" ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
+              <Mail size={10} className="text-blue-500" />
+              Gmail
+            </span>
           ) : (
-            <div className="bg-blue-50 dark:bg-blue-500/10 p-1.5 rounded-lg text-blue-600 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-500/20" title="Source: Email">
-              <Mail size={14} />
-            </div>
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
+              <MessageCircle size={10} className="text-emerald-500" />
+              WhatsApp
+            </span>
           )}
         </div>
 
@@ -255,18 +231,18 @@ function TaskCard({
             <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
               <User size={10} className="text-indigo-600 dark:text-indigo-400" />
             </div>
-            <span className="font-medium text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
+            <span className="font-semibold text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Calendar size={12} className={overdue ? "text-red-500 dark:text-red-400" : ""} />
-            <span className={overdue ? "text-red-600 dark:text-red-400 font-bold" : "font-medium"}>
+            <Calendar size={11} className={overdue ? "text-red-500 dark:text-red-400" : "text-gray-400"} />
+            <span className={overdue ? "text-red-600 dark:text-red-400 font-bold" : "font-semibold text-gray-600 dark:text-gray-300"}>
               {formatDate(task.deadline)}
             </span>
           </div>
         </div>
 
         {/* Source Group Context */}
-        <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50/80 dark:bg-white/5 px-2 py-1.5 rounded-lg border border-gray-100 dark:border-white/5 font-medium">
+        <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50/80 dark:bg-[#1a1a1f] px-2 py-1.5 rounded-lg border border-gray-100 dark:border-white/5 font-semibold">
           <span className="whitespace-normal break-words">
             {showFrom ? `📍 From: ${task.sourceGroup}` : `📁 ${task.sourceGroup}`}
           </span>
@@ -274,23 +250,23 @@ function TaskCard({
 
         {/* Confidence / Action needed */}
         {showConfirmButtons && (
-          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-2 text-[11px] text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5 shadow-sm mt-1">
-            <Sparkles size={12} className="text-amber-500 dark:text-amber-400" />
+          <div className="bg-amber-50/60 dark:bg-amber-500/5 border border-amber-200/70 dark:border-amber-500/20 rounded-lg px-2.5 py-2 text-[10px] text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5 shadow-sm mt-1">
+            <Sparkles size={11} className="text-amber-500 dark:text-amber-400 animate-pulse" />
             AI Confidence: {task.confidence}%
           </div>
         )}
 
         {/* View source message */}
-        <div className="border-t border-gray-100 dark:border-white/10 pt-3 mt-1">
+        <div className="border-t border-gray-100 dark:border-white/5 pt-3 mt-1">
           <button
             onClick={() => setShowSource((p) => !p)}
-            className="flex items-center justify-between w-full text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold transition-colors"
+            className="flex items-center justify-between w-full text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-bold transition-colors"
           >
             <span className="flex items-center gap-1.5">
-              {showSource ? <EyeOff size={13} /> : <Eye size={13} />}
-              {showSource ? "Hide message source" : "View message source"}
+              {showSource ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showSource ? "Hide source context" : "View source context"}
             </span>
-            <ChevronDown size={13} className={`transform transition-transform ${showSource ? "rotate-180" : ""}`} />
+            <ChevronDown size={12} className={`transform transition-transform duration-300 ${showSource ? "rotate-180" : ""}`} />
           </button>
 
           <AnimatePresence>
@@ -301,9 +277,9 @@ function TaskCard({
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-[#f8fafc] dark:bg-black/40 border border-gray-200 dark:border-white/5 rounded-lg p-3 text-[12px] text-gray-700 dark:text-gray-300 relative shadow-inner">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-300 dark:bg-indigo-700 rounded-l-lg" />
-                  <p className="whitespace-normal leading-relaxed break-words font-medium">
+                <div className="bg-[#f8fafc] dark:bg-black/30 border border-gray-200/50 dark:border-white/5 rounded-lg p-3 text-[11px] text-gray-700 dark:text-gray-300 relative shadow-inner">
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500 dark:bg-indigo-700 rounded-l-lg" />
+                  <p className="whitespace-normal leading-relaxed break-words font-medium italic">
                     "{task.sourceMessage}"
                   </p>
                 </div>
@@ -318,23 +294,23 @@ function TaskCard({
             <>
               <button
                 onClick={() => onConfirm?.(task.id)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-200 dark:shadow-none"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
               >
-                <CheckCircle2 size={14} /> Accept
+                <CheckCircle2 size={13} /> Accept
               </button>
               <button
                 onClick={() => onDismiss?.(task.id)}
-                className="flex-1 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[12px] font-bold rounded-lg py-2 transition-all border border-gray-200 dark:border-white/10 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm"
+                className="flex-1 bg-white dark:bg-[#1a1a1f] hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
               >
-                <X size={14} /> Reject
+                <X size={13} /> Reject
               </button>
             </>
           ) : task.status === "pending" ? (
             <button
               onClick={() => onMarkDone?.(task.id)}
-              className="w-full bg-white dark:bg-white/5 hover:bg-green-50 dark:hover:bg-green-500/10 text-gray-600 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 text-[12px] font-bold rounded-lg py-2 transition-all border border-gray-200 dark:border-white/10 dark:hover:border-green-500/30 flex items-center justify-center gap-1.5 group-hover:border-green-200 dark:group-hover:border-green-500/20 shadow-sm"
+              className="w-full bg-white dark:bg-[#1a1a1f] hover:bg-green-50 dark:hover:bg-green-500/10 text-gray-600 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-green-500/30 flex items-center justify-center gap-1.5 group-hover:border-green-200/50 dark:group-hover:border-green-500/20 shadow-sm active:scale-[0.98]"
             >
-              <CheckCircle2 size={14} className="text-green-600 dark:text-green-500 group-hover:scale-110 transition-transform" /> Mark as Done
+              <CheckCircle2 size={13} className="text-green-600 dark:text-green-500 group-hover:scale-110 transition-transform" /> Mark as Done
             </button>
           ) : null}
         </div>
@@ -379,19 +355,30 @@ function DashboardView({
   onDismiss,
 }: {
   tasks: Task[];
-  onMarkDone: (id: number) => void;
-  onConfirm: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onMarkDone: (id: number | string) => void;
+  onConfirm: (id: number | string) => void;
+  onDismiss: (id: number | string) => void;
 }) {
-  const confirmed = tasks.filter((t) => t.status === "pending" && t.confidence >= 85);
-  const unconfirmed = tasks.filter((t) => t.confidence < 85 && t.status !== "done");
-  const done = tasks.filter((t) => t.status === "done");
+  const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp">("all");
+
+  const filteredTasks = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
+
+  const confirmed = filteredTasks.filter((t) => t.status === "pending" && t.confidence >= 85);
+  const unconfirmed = filteredTasks.filter((t) => t.confidence < 85 && t.status !== "done");
+  const done = filteredTasks.filter((t) => t.status === "done");
 
   const sorted = [...confirmed].sort((a, b) => {
     const pd = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     if (pd !== 0) return pd;
     return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
   });
+
+  const sources: { id: "all" | "email" | "slack" | "whatsapp"; label: string; icon: React.ReactNode }[] = [
+    { id: "all", label: "All Handoffs", icon: <Inbox size={13} /> },
+    { id: "email", label: "Gmail Inbox", icon: <Mail size={13} /> },
+    { id: "slack", label: "Slack Teams", icon: <MessageCircle size={13} className="rotate-90 text-purple-500" /> },
+    { id: "whatsapp", label: "WhatsApp Chats", icon: <MessageCircle size={13} className="text-emerald-500" /> },
+  ];
 
   return (
     <div className="flex flex-col gap-8">
@@ -401,34 +388,60 @@ function DashboardView({
         <div className="relative z-10 w-full">
           <h2 className="text-2xl font-bold mb-3 flex items-center gap-2">
             <Sparkles size={24} className="text-yellow-300 animate-pulse" />
-            Your AI Task Kanban Board
+            Agency Control Center
           </h2>
           <p className="text-indigo-100 dark:text-indigo-200/80 text-sm md:text-base max-w-3xl leading-relaxed">
-            Welcome to the new professional dashboard. AI extracts tasks from WhatsApp & Emails automatically. 
-            Review unconfirmed tasks in the first column, manage your active to-dos in the center, and track your wins on the right.
+            Welcome to your executive console. TaskPulse scans your Slack channels and Gmail inboxes, applying Gemini AI logic to automatically structure client deliverables. Filter by channel below, drag and drop, and oversee performance instantly.
           </p>
+        </div>
+      </div>
+
+      {/* Segmented Filter Control */}
+      <div className="flex justify-between items-center bg-white dark:bg-[#121214] p-3 rounded-2xl border border-gray-200/60 dark:border-white/5 shadow-sm">
+        <div className="flex flex-wrap gap-1.5 p-1 bg-gray-100/50 dark:bg-white/5 rounded-xl border border-gray-200/40 dark:border-white/5 shadow-inner">
+          {sources.map((src) => {
+            const active = selectedSource === src.id;
+            return (
+              <button
+                key={src.id}
+                onClick={() => setSelectedSource(src.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-250 cursor-pointer ${
+                  active
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-white/5"
+                }`}
+              >
+                {src.icon}
+                {src.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 px-3">
+          <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span>Active Scanner Live</span>
         </div>
       </div>
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Column 1: AI Suggestions / Needs Review */}
-        <div className="bg-gray-100/60 dark:bg-white/5 rounded-2xl p-4 flex flex-col gap-4 border border-gray-200 dark:border-white/10 shadow-inner min-h-[500px]">
+        <div className="bg-gray-50/50 dark:bg-[#111113]/40 rounded-2xl p-4 flex flex-col gap-4 border border-gray-200/60 dark:border-white/5 shadow-sm min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
-                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-[16px]">Needs Review</h3>
+                <div className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse" />
+                <h3 className="font-extrabold text-gray-800 dark:text-gray-100 text-[15px]">Needs Review</h3>
               </div>
-              <span className="bg-white dark:bg-black/40 text-gray-700 dark:text-gray-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-gray-200 dark:border-white/10 shadow-sm">{unconfirmed.length}</span>
+              <span className="bg-white dark:bg-black/30 text-gray-700 dark:text-gray-300 text-[10px] font-extrabold rounded-full px-2.5 py-1 border border-gray-200 dark:border-white/5 shadow-sm">{unconfirmed.length}</span>
             </div>
-            <p className="text-[12px] text-gray-500 dark:text-gray-400 font-medium">AI found these tasks. Please confirm.</p>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold">AI identified these tasks. Confirm to add to board.</p>
           </div>
           
           <div className="flex flex-col gap-3">
             <AnimatePresence>
               {unconfirmed.length === 0 ? (
-                <EmptyState message="No tasks to review 🎉" />
+                <EmptyState message="All suggestions reviewed! 🎉" />
               ) : (
                 unconfirmed.map((t) => (
                   <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} />
@@ -439,22 +452,22 @@ function DashboardView({
         </div>
 
         {/* Column 2: To Do / Active Tasks */}
-        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl p-4 flex flex-col gap-4 border border-indigo-100 dark:border-indigo-900/30 shadow-inner min-h-[500px]">
+        <div className="bg-indigo-50/20 dark:bg-indigo-950/5 rounded-2xl p-4 flex flex-col gap-4 border border-indigo-100/50 dark:border-indigo-950/20 shadow-sm min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm" />
-                <h3 className="font-bold text-gray-800 dark:text-indigo-100 text-[16px]">Active Tasks</h3>
+                <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(79,70,229,0.5)] animate-pulse" />
+                <h3 className="font-extrabold text-gray-800 dark:text-indigo-100 text-[15px]">Active Tasks</h3>
               </div>
-              <span className="bg-white dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-indigo-200 dark:border-indigo-800/50 shadow-sm">{sorted.length}</span>
+              <span className="bg-white dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-extrabold rounded-full px-2.5 py-1 border border-indigo-100/50 dark:border-indigo-900/30 shadow-sm">{sorted.length}</span>
             </div>
-            <p className="text-[12px] text-gray-500 dark:text-indigo-200/60 font-medium">Confirmed tasks ready to be worked on.</p>
+            <p className="text-[11px] text-gray-400 dark:text-indigo-300/40 font-semibold">Confirmed tasks ready to be finalized.</p>
           </div>
 
           <div className="flex flex-col gap-3">
             <AnimatePresence>
               {sorted.length === 0 ? (
-                <EmptyState message="All caught up! 🎉" />
+                <EmptyState message="All tasks caught up! 🎉" />
               ) : (
                 sorted.map((t) => (
                   <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
@@ -465,22 +478,22 @@ function DashboardView({
         </div>
 
         {/* Column 3: Completed */}
-        <div className="bg-green-50/40 dark:bg-emerald-950/20 rounded-2xl p-4 flex flex-col gap-4 border border-green-100 dark:border-emerald-900/30 shadow-inner min-h-[500px]">
+        <div className="bg-emerald-50/20 dark:bg-emerald-950/5 rounded-2xl p-4 flex flex-col gap-4 border border-emerald-100/40 dark:border-emerald-950/20 shadow-sm min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm" />
-                <h3 className="font-bold text-gray-800 dark:text-emerald-100 text-[16px]">Completed</h3>
+                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+                <h3 className="font-extrabold text-gray-800 dark:text-emerald-100 text-[15px]">Completed</h3>
               </div>
-              <span className="bg-white dark:bg-emerald-950/40 text-green-700 dark:text-emerald-300 text-[11px] font-extrabold rounded-full px-2.5 py-1 border border-green-200 dark:border-emerald-800/50 shadow-sm">{done.length}</span>
+              <span className="bg-white dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold rounded-full px-2.5 py-1 border border-emerald-100/40 dark:border-emerald-900/30 shadow-sm">{done.length}</span>
             </div>
-            <p className="text-[12px] text-gray-500 dark:text-emerald-200/60 font-medium">Tasks finished successfully.</p>
+            <p className="text-[11px] text-gray-400 dark:text-emerald-300/40 font-semibold">Tasks marked as done successfully.</p>
           </div>
 
           <div className="flex flex-col gap-3">
             <AnimatePresence>
               {done.length === 0 ? (
-                <EmptyState message="No tasks done yet" />
+                <EmptyState message="No tasks done yet." />
               ) : (
                 done.map((t) => (
                   <TaskCard key={t.id} task={t} />
@@ -648,146 +661,17 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
   );
 }
 
-// ─── VIEW: WHATSAPP ───────────────────────────────────────────────────────────
-
-function WhatsAppView() {
-  const [showSetup, setShowSetup] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [activeGroup, setActiveGroup] = useState("flipkart");
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const messages = WA_MESSAGES[activeGroup] ?? [];
-  const group = WA_GROUPS.find((g) => g.id === activeGroup)!;
-
-  if (!mounted) return null;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">WhatsApp Integration</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your connected WhatsApp groups and task extraction.</p>
-        </div>
-        <button 
-          onClick={() => setShowSetup(!showSetup)}
-          className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 px-4 py-2 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors shadow-sm cursor-pointer"
-        >
-          <Settings size={16} />
-          {showSetup ? "Back to Chat" : "Setup WhatsApp"}
-        </button>
-      </div>
-
-      {showSetup ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10">
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Connection</h2>
-            <WhatsAppConnector onConnected={() => setRefreshKey(k => k + 1)} />
-          </div>
-          <div className="bg-white dark:bg-[#18181b] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10">
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Monitored Groups</h2>
-            <GroupSelector key={refreshKey} />
-          </div>
-        </div>
-      ) : (
-        <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
-          {/* Left panel */}
-          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
-            <div className="bg-[#075E54] dark:bg-[#054c44] text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
-              <MessageCircle size={16} /> Groups
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {WA_GROUPS.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setActiveGroup(g.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100 dark:border-white/5 text-left ${activeGroup === g.id ? "bg-green-50 dark:bg-green-950/20" : ""}`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {g.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{g.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{g.members} members</p>
-                  </div>
-                  {g.unread > 0 && (
-                    <span className="bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
-                      {g.unread}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Right panel */}
-          <div className="flex-1 flex flex-col" style={{ background: "#e5ddd5" }}>
-            {/* Chat header */}
-            <div className="bg-[#075E54] dark:bg-[#054c44] text-white px-5 py-3 flex items-center gap-3 flex-shrink-0">
-              <div className="w-9 h-9 rounded-full bg-green-300 dark:bg-green-700 flex items-center justify-center text-[#075E54] dark:text-white font-bold text-sm">
-                {group.name.charAt(0)}
-              </div>
-              <div>
-                <p className="font-semibold text-sm">{group.name}</p>
-                <p className="text-xs text-green-200 dark:text-green-400">{group.members} members</p>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3" style={{ background: "#e5ddd5" }}>
-              <AnimatePresence>
-                {messages.map((msg, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex flex-col ${msg.outgoing ? "items-end" : "items-start"}`}
-                  >
-                    <div
-                      className={`max-w-[70%] px-3 py-2 rounded-xl shadow-sm text-sm ${
-                        msg.outgoing
-                          ? "bg-[#DCF8C6] dark:bg-[#056162] dark:text-white rounded-tr-sm"
-                          : "bg-white dark:bg-[#202c33] dark:text-white rounded-tl-sm"
-                      }`}
-                    >
-                      {!msg.outgoing && (
-                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-0.5">{msg.sender}</p>
-                      )}
-                      <p className="text-gray-800 dark:text-gray-200 leading-relaxed">{msg.message}</p>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 text-right mt-1">{msg.time}</p>
-                    </div>
-                    {msg.hasTask && (
-                      <div className="mt-1 bg-blue-100 border border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-900/50 dark:text-blue-300 text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1">
-                        🤖 Task Extracted by TaskPulse
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-
-            {/* Input bar */}
-            <div className="bg-[#f0f0f0] dark:bg-[#202c33] border-t border-gray-200 dark:border-white/5 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-              <input
-                type="text"
-                placeholder="Type a message (Read-only simulation)"
-                className="flex-1 bg-white dark:bg-[#2a3942] rounded-full px-4 py-2 text-sm text-gray-400 dark:text-gray-500 italic outline-none border border-gray-200 dark:border-white/5"
-                readOnly
-              />
-              <button className="w-9 h-9 bg-gray-300 dark:bg-white/5 rounded-full flex items-center justify-center text-white cursor-not-allowed">
-                <Send size={15} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── VIEW: EMAIL ──────────────────────────────────────────────────────────────
 
-function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) {
+function EmailView({ 
+  onToast, 
+  loadTasks, 
+  setActiveTab 
+}: { 
+  onToast: (msg: string) => void;
+  loadTasks: () => Promise<void>;
+  setActiveTab: (tab: Tab) => void;
+}) {
   const [selected, setSelected] = useState(1);
   const [loading, setLoading] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
@@ -821,7 +705,8 @@ function EmailView({ onToast, setTasks }: { onToast: (msg: string) => void, setT
       }
       const data = await res.json();
       if (data.tasks) {
-        setTasks(prev => [...data.tasks, ...prev]);
+        await loadTasks();
+        setActiveTab("dashboard");
         onToast(`Successfully extracted ${data.tasks.length} tasks from real Gmail!`);
       } else if (data.error) {
         onToast(`Error: ${data.error}. ${data.details || ""}`);
@@ -1139,7 +1024,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard",     icon: <BarChart2 size={15} /> },
   { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
   { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
-  { id: "whatsapp",  label: "Mock WhatsApp", icon: <MessageCircle size={15} /> },
+  { id: "slack",     label: "Slack Connect", icon: <Hash size={15} /> },
   { id: "email",     label: "Email",    icon: <Mail size={15} /> },
 ];
 
@@ -1149,27 +1034,28 @@ export default function TaskPulse() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
 
-  useEffect(() => {
-    setMounted(true);
-    const loadTasks = async () => {
-      try {
-        const r = await fetch("/api/tasks");
-        const d = await r.json();
-        if (Array.isArray(d)) {
-          if (d.length > 0) {
-            setTasks(d);
-          } else {
-            setTasks(INITIAL_TASKS);
-          }
+  const loadTasks = async () => {
+    try {
+      const r = await fetch("/api/tasks");
+      const d = await r.json();
+      if (Array.isArray(d)) {
+        if (d.length > 0) {
+          setTasks(d);
         } else {
           setTasks(INITIAL_TASKS);
         }
-      } catch {
+      } else {
         setTasks(INITIAL_TASKS);
-      } finally {
-        setLoadingTasks(false);
       }
-    };
+    } catch {
+      setTasks(INITIAL_TASKS);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  useEffect(() => {
+    setMounted(true);
     loadTasks();
   }, []);
   
@@ -1185,27 +1071,6 @@ export default function TaskPulse() {
   };
 
   const dismissToast = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
-
-  // WhatsApp Task Streaming
-  useTaskStream((newTask: any) => {
-    // Map extracted task to dashboard task type
-    const mapped: Task = {
-      id: Date.now(), // Local ephemeral ID for UI
-      title: newTask.title,
-      client: newTask.sourcePayload.groupName.split(' ')[0], // Best effort client detection
-      assignedTo: newTask.assignee || "Unassigned",
-      deadline: newTask.deadline || new Date().toISOString().split('T')[0],
-      priority: newTask.priority,
-      source: "whatsapp",
-      sourceGroup: newTask.sourcePayload.groupName,
-      status: newTask.status === "confirmed" ? "pending" : "pending", // Dashboard uses 'pending'
-      confidence: newTask.confidence,
-      sourceMessage: newTask.sourcePayload.messageText,
-    };
-    
-    setTasks((prev) => [mapped, ...prev]);
-    addToast(`New task detected from WhatsApp: ${newTask.title}`);
-  });
 
   if (status === "loading") {
     return (
@@ -1302,7 +1167,7 @@ export default function TaskPulse() {
         </div>
 
         <div className="flex items-center ml-4">
-          <WAStatusBadge />
+          <SlackStatusBadge />
         </div>
 
         {/* Tabs */}
@@ -1408,8 +1273,20 @@ export default function TaskPulse() {
             {activeTab === "employee" && (
               <EmployeeView tasks={tasks} onMarkDone={markDone} />
             )}
-            {activeTab === "whatsapp" && <WhatsAppView />}
-            {activeTab === "email" && <EmailView onToast={addToast} setTasks={setTasks} />}
+            {activeTab === "slack" && (
+              <SlackSetup 
+                onToast={addToast} 
+                loadTasks={loadTasks} 
+                setActiveTab={setActiveTab} 
+              />
+            )}
+            {activeTab === "email" && (
+              <EmailView 
+                onToast={addToast} 
+                loadTasks={loadTasks} 
+                setActiveTab={setActiveTab} 
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

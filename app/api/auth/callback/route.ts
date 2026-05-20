@@ -36,6 +36,14 @@ export async function GET(request: Request) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7
     })
+    if (tokens.refresh_token) {
+      response.cookies.set("gmail_refresh_token", tokens.refresh_token, {
+        path: "/",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30 * 6 // 6 months
+      })
+    }
     response.cookies.set("gmail_email", userEmail, {
       path: "/",
       httpOnly: false, // readable by client JS

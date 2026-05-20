@@ -13,6 +13,7 @@ export async function GET() {
       "https://www.googleapis.com/auth/userinfo.email"
     ],
     access_type: "offline",
+    prompt: "consent",
   })
   
   return Response.redirect(url)
