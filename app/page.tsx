@@ -19,6 +19,7 @@ import {
   Sparkles,
   Loader2,
   BarChart2,
+  Video,
   Users,
   Briefcase,
   Inbox,
@@ -28,13 +29,15 @@ import {
   Hash,
 } from "lucide-react";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
+import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
+import { MeetingTab } from "@/components/MeetingTab";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "whatsapp" | "email" | "slack";
+type Source = "whatsapp" | "email" | "slack" | "zoom" | "google_meet";
 type Status = "pending" | "done";
 
 interface Task {
@@ -51,7 +54,7 @@ interface Task {
   sourceMessage: string;
 }
 
-type Tab = "dashboard" | "client" | "employee" | "slack" | "email";
+type Tab = "dashboard" | "client" | "employee" | "slack" | "whatsapp" | "email" | "meetings";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 
@@ -1022,6 +1025,7 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard",     icon: <BarChart2 size={15} /> },
+  { id: "meetings",  label: "Meetings",      icon: <Video size={15} /> },
   { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
   { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
   { id: "slack",     label: "Slack Connect", icon: <Hash size={15} /> },
@@ -1267,6 +1271,7 @@ export default function TaskPulse() {
                 onDismiss={dismissTask}
               />
             )}
+            {activeTab === "meetings" && <MeetingTab />}
             {activeTab === "client" && (
               <ClientView tasks={tasks} onMarkDone={markDone} />
             )}
