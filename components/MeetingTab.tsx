@@ -7,17 +7,19 @@ import { Video, FileText, Upload, Plus, Calendar, User, CheckCircle2, AlertCircl
 interface Meeting {
   id: string;
   title: string;
-  platform: 'google_meet' | 'zoom' | 'teams' | 'manual';
+  platform: 'google_meet' | 'zoom' | 'teams' | 'manual' | 'fathom';
   meeting_date: string;
   summary: string;
   key_topics: string[];
   decisions: any[];
+  transcript_url?: string;
 }
 
 export function MeetingTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isFathomSyncing, setIsFathomSyncing] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -69,6 +71,28 @@ export function MeetingTab() {
     }
   };
 
+  const handleFathomSync = async () => {
+    setIsFathomSyncing(true);
+    try {
+      const res = await fetch("/api/meetings/sync/fathom", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        if (data.processed && data.processed.length > 0) {
+          fetchMeetings();
+        } else {
+          alert(data.message || "All Fathom meetings are already synced.");
+        }
+      } else {
+        alert(data.error || "Fathom sync failed");
+      }
+    } catch (err) {
+      console.error("Fathom sync error", err);
+      alert("Failed to sync Fathom meetings");
+    } finally {
+      setIsFathomSyncing(false);
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -116,6 +140,14 @@ export function MeetingTab() {
             Sync Google Meet
           </button>
           <button
+            onClick={handleFathomSync}
+            disabled={isFathomSyncing}
+            className="bg-white dark:bg-white/5 border border-violet-200 dark:border-violet-900/30 text-violet-700 dark:text-violet-400 text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/10 disabled:opacity-50 shadow-sm"
+          >
+            {isFathomSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} className="text-violet-500" />}
+            Sync Fathom
+          </button>
+          <button
             onClick={() => setIsUploading(true)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors transition-transform active:scale-95"
           >
@@ -161,6 +193,7 @@ export function MeetingTab() {
                   <option value="zoom">Zoom</option>
                   <option value="google_meet">Google Meet</option>
                   <option value="teams">MS Teams</option>
+                  <option value="fathom">Fathom</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -234,9 +267,10 @@ export function MeetingTab() {
               >
                 <div className="flex items-center gap-4">
                   <div className={`p-2 rounded-lg ${
-                    meeting.platform === 'zoom' ? 'bg-blue-100 text-blue-600' :
-                    meeting.platform === 'google_meet' ? 'bg-green-100 text-green-600' :
-                    'bg-indigo-100 text-indigo-600'
+                    meeting.platform === 'zoom' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                    meeting.platform === 'google_meet' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                    meeting.platform === 'fathom' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' :
+                    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                   }`}>
                     <Video size={20} />
                   </div>
@@ -260,9 +294,22 @@ export function MeetingTab() {
                   <div className="py-4 space-y-4">
                     <div>
                       <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Summary</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">
                         {meeting.summary}
                       </p>
+                      {meeting.transcript_url && (
+                        <div className="pt-1">
+                          <a
+                            href={meeting.transcript_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-950/30 border-violet-200 dark:border-violet-900/50 text-violet-700 dark:text-violet-400 transition-colors shadow-sm cursor-pointer"
+                          >
+                            <Video size={12} className="text-violet-500" />
+                            View Fathom Recording
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

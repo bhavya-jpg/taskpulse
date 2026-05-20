@@ -37,7 +37,7 @@ import { useTheme } from "next-themes";
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "whatsapp" | "email" | "slack" | "zoom" | "google_meet";
+type Source = "whatsapp" | "email" | "slack" | "zoom" | "google_meet" | "fathom";
 type Status = "pending" | "done";
 
 interface Task {
@@ -215,6 +215,21 @@ function TaskCard({
               <Mail size={10} className="text-blue-500" />
               Gmail
             </span>
+          ) : task.source === "fathom" ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-violet-50/50 dark:bg-violet-950/15 border-violet-200/50 dark:border-violet-900/35 text-violet-700 dark:text-violet-400 shadow-sm">
+              <Video size={10} className="text-violet-500" />
+              Fathom
+            </span>
+          ) : task.source === "zoom" ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
+              <Video size={10} className="text-blue-500" />
+              Zoom
+            </span>
+          ) : task.source === "google_meet" ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
+              <Video size={10} className="text-emerald-500" />
+              Google Meet
+            </span>
           ) : (
             <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
               <MessageCircle size={10} className="text-emerald-500" />
@@ -362,7 +377,7 @@ function DashboardView({
   onConfirm: (id: number | string) => void;
   onDismiss: (id: number | string) => void;
 }) {
-  const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp">("all");
+  const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
 
   const filteredTasks = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
 
@@ -376,11 +391,12 @@ function DashboardView({
     return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
   });
 
-  const sources: { id: "all" | "email" | "slack" | "whatsapp"; label: string; icon: React.ReactNode }[] = [
+  const sources: { id: "all" | "email" | "slack" | "whatsapp" | "fathom"; label: string; icon: React.ReactNode }[] = [
     { id: "all", label: "All Handoffs", icon: <Inbox size={13} /> },
     { id: "email", label: "Gmail Inbox", icon: <Mail size={13} /> },
     { id: "slack", label: "Slack Teams", icon: <MessageCircle size={13} className="rotate-90 text-purple-500" /> },
     { id: "whatsapp", label: "WhatsApp Chats", icon: <MessageCircle size={13} className="text-emerald-500" /> },
+    { id: "fathom", label: "Fathom Meetings", icon: <Video size={13} className="text-violet-500" /> },
   ];
 
   return (
