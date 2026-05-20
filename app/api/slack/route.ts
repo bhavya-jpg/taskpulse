@@ -90,12 +90,36 @@ async function getSlackUsername(userId: string, token: string): Promise<string> 
 function hasTaskKeywords(text: string): boolean {
   const normalized = text.toLowerCase();
   const taskKeywords = [
+    // Standard English Task Keywords
     "please", "need you to", "need to", "action", "task", "submit", "deliver",
     "deadline", "by tomorrow", "by friday", "by eod", "by monday", "tomorrow eod",
     "urgently", "urgent", "creative", "creatives", "ppt", "deck", "proposal",
     "invoice", "send", "design", "make", "create", "fix", "update", "schedule",
     "meeting", "call", "review", "approved", "approve", "feedback", "revise",
-    "revisions", "changes", "do this", "handle", "finish", "complete", "status"
+    "revisions", "changes", "do this", "handle", "finish", "complete", "status",
+    "assign", "report", "check", "verify", "deploy", "build", "bug", "issue",
+    
+    // Expanded English Task Indicators
+    "todo", "to-do", "tasked", "action item", "action items", "assigned", "assignee",
+    "draft", "write", "prepare", "compile", "format", "document", "code", "develop",
+    "qa", "test", "audit", "inspect", "upload", "download", "share", "export",
+    "import", "deliverable", "deliverables", "asap", "as soon as possible", "due by",
+    "due date", "timeline", "milestone", "target date", "follow up", "follow-up",
+    "chase", "remind", "reminder", "ping", "fix this", "debug", "resolve", "solve",
+    "repair", "patch", "hotfix", "modify", "edit", "refactor", "redo", "re-do",
+    "book", "setup", "arrange", "organize", "input", "thoughts", "sign-off", "sign off",
+    "presentation", "slides", "spreadsheet", "sheet", "dashboard", "sync", "alignment",
+    "huddle", "discuss", "forward", "attach", "run", "execute", "start", "begin",
+    
+    // Hinglish Action & Task Keywords (Massive Quota Saver)
+    "bhai", "yaar", "kal tak", "aaj tak", "shaam tak", "parso tak", "jaldi", 
+    "urgent hai", "turant", "bhej", "bhejo", "bhej dena", "mail kar", "mail kardo",
+    "send kar", "send kardo", "banado", "bana dena", "bana do", "banana hai",
+    "kar dena", "kar do", "kardo", "kar de", "karle", "complete kar", "complete kardo",
+    "complete kar dena", "finish kar", "finish kardo", "check kar", "check karlo", 
+    "check karo", "review kar", "review karlo", "review karo", "feedback de", 
+    "update kar", "update kardo", "update kar dena", "dekh le", "dekh lena", "dedo",
+    "de do", "de dena", "dedena", "chahiye", "kam kar", "kaam kar", "banaye"
   ];
   return taskKeywords.some(kw => normalized.includes(kw));
 }
