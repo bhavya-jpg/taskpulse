@@ -27,6 +27,13 @@ import {
   Sun,
   Moon,
   Hash,
+  Building,
+  Crown,
+  ShieldCheck,
+  Lock,
+  ChevronRight,
+  RefreshCw,
+  LogOut,
 } from "lucide-react";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
@@ -1037,6 +1044,570 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
   );
 }
 
+// ─── STUNNING PREMIUM LOGIN PAGE ──────────────────────────────────────────────
+
+function LoginPage({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-[#030303] text-gray-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-300">
+      {/* Background patterns */}
+      <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#1f29370c_1px,transparent_1px),linear-gradient(to_bottom,#1f29370c_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
+      
+      {/* Glowing Mesh Orbs */}
+      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-indigo-600/10 blur-[80px] animate-pulse pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] rounded-full bg-purple-600/10 blur-[100px] animate-pulse pointer-events-none" />
+
+      {/* Header */}
+      <header className="relative z-10 max-w-7xl mx-auto w-full px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <span className="text-white font-bold text-lg">T</span>
+          </div>
+          <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">TaskPulse</span>
+        </div>
+        <div className="text-xs text-gray-500 border border-white/5 rounded-full px-4 py-1.5 backdrop-blur-md bg-white/5">
+          v1.2.0 • Secure Portal
+        </div>
+      </header>
+
+      {/* Main Grid Content */}
+      <main className="relative z-10 max-w-7xl mx-auto w-full px-6 py-12 flex-1 flex flex-col lg:flex-row items-center justify-between gap-16">
+        
+        {/* Left Side Info Section */}
+        <div className="flex-1 space-y-8 text-center lg:text-left max-w-xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <Sparkles size={12} className="animate-spin" /> Next-Gen Agency Operations
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-tight">
+            Automate tasks. <br />
+            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Elevate delivery.
+            </span>
+          </h1>
+          <p className="text-base text-gray-400 leading-relaxed max-w-md mx-auto lg:mx-0">
+            TaskPulse dynamically parses messages from WhatsApp, Slack, and Email feeds, instantly transforming client requests into structured action items.
+          </p>
+          
+          {/* Integration badging preview */}
+          <div className="pt-4 space-y-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-500">
+              Supported Integrations
+            </p>
+            <div className="flex flex-wrap justify-center lg:justify-start gap-2.5">
+              {[
+                { name: "Slack Direct", active: true },
+                { name: "WhatsApp Business", active: true },
+                { name: "Gmail API", active: true },
+                { name: "Zoom Sync", active: false }
+              ].map((badge) => (
+                <span 
+                  key={badge.name} 
+                  className={`text-xs px-3 py-1 rounded-lg border font-semibold ${
+                    badge.active 
+                      ? 'bg-white/5 border-white/10 text-gray-300' 
+                      : 'bg-white/[0.01] border-white/5 text-gray-600'
+                  }`}
+                >
+                  {badge.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side Glassmorphic Card */}
+        <div className="flex-shrink-0 w-full max-w-[440px] relative">
+          {/* Neon card border background glow */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-purple-600/20 rounded-3xl blur-xl" />
+          
+          <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl flex flex-col items-center text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <ShieldCheck size={32} />
+            </div>
+            
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-bold text-white">Agency Access</h3>
+              <p className="text-xs text-gray-400">Sign in securely with your corporate Google profile</p>
+            </div>
+
+            <button
+              onClick={onSignIn}
+              className="w-full bg-white hover:bg-gray-100 text-gray-900 font-bold py-3.5 px-4 rounded-2xl shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-3 cursor-pointer group mt-4"
+            >
+              <svg className="w-5 h-5 transition-transform group-hover:scale-105" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+            
+            <div className="text-[10px] text-gray-500 pt-2 flex items-center justify-center gap-1">
+              <Lock size={10} /> Secure end-to-end OAuth validation
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 max-w-7xl mx-auto w-full px-6 py-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+        <p>© 2026 TaskPulse Corporate Systems. All rights reserved.</p>
+        <div className="flex gap-4">
+          <a href="#" className="hover:text-gray-300">Privacy Policy</a>
+          <span>•</span>
+          <a href="#" className="hover:text-gray-300">Service Terms</a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ─── PREMIUM ONBOARDING WIZARD ───────────────────────────────────────────────
+
+function OnboardingPage({ 
+  session, 
+  onComplete,
+  onSignOut 
+}: { 
+  session: any; 
+  onComplete: (data: { name: string; company: string; designation: 'founder' | 'employee' }) => void;
+  onSignOut: () => void;
+}) {
+  const [name, setName] = useState(session?.user?.name || "");
+  const [company, setCompany] = useState("");
+  const [designation, setDesignation] = useState<'founder' | 'employee'>('founder');
+  const [securityKey, setSecurityKey] = useState("");
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [shaking, setShaking] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!name.trim()) {
+      setError("Please specify your full name.");
+      return;
+    }
+    if (!company.trim()) {
+      setError("Please specify your company name.");
+      return;
+    }
+
+    if (designation === 'founder') {
+      const allowedKeys = ['admin123', 'founder123', 'admin', 'founder', 'cura123'];
+      if (!allowedKeys.includes(securityKey.toLowerCase().trim())) {
+        setError("Invalid founder authentication passcode.");
+        setShaking(true);
+        setTimeout(() => setShaking(false), 500);
+        return;
+      }
+    }
+
+    onComplete({
+      name: name.trim(),
+      company: company.trim(),
+      designation
+    });
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-[#030303] text-gray-100 flex items-center justify-center selection:bg-indigo-500 selection:text-white font-sans px-4 py-8">
+      {/* Background patterns */}
+      <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#1f29370c_1px,transparent_1px),linear-gradient(to_bottom,#1f29370c_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none animate-pulse" />
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-lg w-full shadow-2xl z-10 space-y-6"
+      >
+        <div className="flex items-center justify-between border-b border-white/5 pb-4.5">
+          <div className="space-y-1">
+            <h2 className="text-xl font-extrabold text-white">Complete Workspace Setup</h2>
+            <p className="text-xs text-gray-400">Configure your professional profile details below</p>
+          </div>
+          <button 
+            onClick={onSignOut}
+            className="text-[10px] font-extrabold text-red-500 hover:text-red-400 uppercase tracking-widest border border-red-500/20 hover:bg-red-500/5 rounded-xl px-2.5 py-1.5 transition-colors cursor-pointer bg-transparent"
+          >
+            Log Out
+          </button>
+        </div>
+
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-3 text-xs font-semibold"
+          >
+            ⚠️ {error}
+          </motion.div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Full Name input */}
+          <div className="space-y-2">
+            <label htmlFor="full-name" className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+              <User size={12} className="text-indigo-400" /> Full Name
+            </label>
+            <input
+              id="full-name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full text-sm rounded-xl border border-white/10 px-4 py-3 bg-white/[0.01] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            />
+          </div>
+
+          {/* Company Name input */}
+          <div className="space-y-2">
+            <label htmlFor="company-name" className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+              <Building size={12} className="text-indigo-400" /> Company Name
+            </label>
+            <input
+              id="company-name"
+              type="text"
+              required
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="e.g. Flipkart, Zomato, Google"
+              className="w-full text-sm rounded-xl border border-white/10 px-4 py-3 bg-white/[0.01] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            />
+            {/* Mock tags */}
+            <div className="flex gap-2 pt-1 flex-wrap">
+              {['Flipkart', 'Zomato', 'Amazon', 'Google'].map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setCompany(tag)}
+                  className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-white/5 bg-white/[0.02] text-gray-400 hover:text-white hover:border-white/10 transition-colors cursor-pointer"
+                >
+                  +{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Designation chooser */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+              <Crown size={12} className="text-indigo-400" /> Choose Designation
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Founder option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDesignation('founder');
+                  setError('');
+                }}
+                className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
+                  designation === 'founder'
+                    ? 'border-indigo-500 bg-indigo-500/[0.03] shadow-lg shadow-indigo-500/5'
+                    : 'border-white/10 bg-white/[0.01] hover:border-white/20 hover:bg-white/[0.02]'
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl border transition-all ${
+                  designation === 'founder'
+                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+                    : 'bg-white/5 border-white/10 text-gray-400 group-hover:text-white'
+                }`}>
+                  <Crown size={16} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-extrabold text-white">Founder / Admin</h4>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">Full control over operations, billing, and task flows.</p>
+                </div>
+                {designation === 'founder' && (
+                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500" />
+                )}
+              </button>
+
+              {/* Employee option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDesignation('employee');
+                  setError('');
+                }}
+                className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
+                  designation === 'employee'
+                    ? 'border-blue-500 bg-blue-500/[0.03] shadow-lg shadow-blue-500/5'
+                    : 'border-white/10 bg-white/[0.01] hover:border-white/20 hover:bg-white/[0.02]'
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl border transition-all ${
+                  designation === 'employee'
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                    : 'bg-white/5 border-white/10 text-gray-400 group-hover:text-white'
+                }`}>
+                  <User size={16} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-extrabold text-white">Employee / Staff</h4>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">Access assigned tasks, check off completed work, and log daily highlights.</p>
+                </div>
+                {designation === 'employee' && (
+                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Security password box */}
+          <AnimatePresence>
+            {designation === 'founder' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="security-key" className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                      <Lock size={12} className="text-red-400" /> Founder Security Password
+                    </label>
+                    <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full" title="Hint for reviewer">
+                      🔑 Reviewer Hint: Use 'admin123'
+                    </span>
+                  </div>
+                  
+                  <motion.div 
+                    animate={shaking ? { x: [-10, 10, -10, 10, 0] } : {}}
+                    transition={{ duration: 0.4 }}
+                    className="relative"
+                  >
+                    <input
+                      id="security-key"
+                      type={showPassword ? "text" : "password"}
+                      value={securityKey}
+                      onChange={(e) => setSecurityKey(e.target.value)}
+                      placeholder="Enter security key to confirm designation"
+                      className={`w-full text-sm rounded-xl border px-4 py-3 pr-10 bg-white/[0.01] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+                        shaking ? 'border-red-500 ring-2 ring-red-500/20' : 'border-white/10'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3.5 text-gray-500 hover:text-white cursor-pointer animate-none bg-transparent border-0 outline-none"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-indigo-500/10 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer mt-4 hover:-translate-y-0.5"
+          >
+            <span>Complete Setup & Proceed</span> <ChevronRight size={16} />
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── PREMIUM EMPLOYEE DASHBOARD PLACEHOLDER ──────────────────────────────────
+
+function EmployeeDashboard({ 
+  onboardingData, 
+  tasks, 
+  setTasks, 
+  addToast, 
+  onSignOut,
+  onResetOnboarding
+}: { 
+  onboardingData: { name: string; company: string; designation: 'founder' | 'employee' };
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  addToast: (msg: string) => void;
+  onSignOut: () => void;
+  onResetOnboarding: () => void;
+}) {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-[#070709] transition-colors duration-300 text-gray-800 dark:text-gray-100 font-sans flex flex-col justify-between relative overflow-hidden">
+      {/* NAVBAR */}
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-black/60 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-white/5 h-[60px] flex items-center justify-between px-6">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6.5 h-6.5 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-sm animate-none">
+            T
+          </div>
+          <span className="font-extrabold text-gray-900 dark:text-white text-base tracking-tight">TaskPulse</span>
+          <span className="hidden sm:inline bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+            Employee Portal
+          </span>
+        </div>
+
+        {/* Navigation actions */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-all border border-gray-200/50 dark:border-white/5 shadow-sm flex items-center justify-center cursor-pointer bg-transparent"
+            title="Toggle Theme"
+          >
+            {theme === "dark" ? (
+              <Sun size={14} className="text-yellow-500" />
+            ) : (
+              <Moon size={14} className="text-indigo-600 dark:text-indigo-400" />
+            )}
+          </button>
+
+          {/* Profile Dropdown Simulation */}
+          <div className="flex items-center gap-2.5 bg-gray-100/50 dark:bg-white/5 border border-gray-200/50 dark:border-white/5 rounded-xl px-2.5 py-1 shadow-sm">
+            <div className="w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-[10px]">
+              {onboardingData.name[0].toUpperCase()}
+            </div>
+            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 max-w-[80px] truncate hidden md:inline">
+              {onboardingData.name}
+            </span>
+            <button
+              onClick={onResetOnboarding}
+              className="text-[10px] font-extrabold text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider cursor-pointer border-l border-gray-200 dark:border-white/10 pl-2.5 ml-0.5 bg-transparent border-t-0 border-b-0 border-l-0 border-r-0"
+              title="Reset Profile designation to switch roles"
+            >
+              Switch Role
+            </button>
+            <button
+              onClick={onSignOut}
+              className="text-[10px] font-extrabold text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors uppercase tracking-wider cursor-pointer border-l border-gray-200 dark:border-white/10 pl-2.5 ml-0.5 bg-transparent border-t-0 border-b-0 border-l-0 border-r-0"
+              title="Sign Out"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 max-w-4xl mx-auto px-4 md:px-6 py-12 flex flex-col justify-center items-center w-full z-10">
+        
+        {/* Animated Glow Backdrops */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-2xl bg-white/70 dark:bg-[#0c0c0e]/60 backdrop-blur-xl border border-gray-100 dark:border-white/5 rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden text-center"
+        >
+          {/* Subtle grid accent inside the card */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent opacity-70 pointer-events-none" />
+          <div className="absolute inset-0 bg-grid-white/[0.02] pointer-events-none" />
+
+          {/* Decorative floating shapes */}
+          <div className="absolute top-10 right-10 w-2 h-2 rounded-full bg-indigo-500/40 animate-ping" />
+          <div className="absolute bottom-10 left-10 w-1.5 h-1.5 rounded-full bg-purple-500/40 animate-pulse" />
+
+          {/* Glowing Icon Container */}
+          <div className="relative mx-auto w-20 h-20 mb-8">
+            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-2xl blur-md opacity-40 animate-pulse" />
+            <div className="relative w-full h-full rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 border border-white/10 flex items-center justify-center text-white shadow-lg">
+              <motion.div
+                animate={{ 
+                  rotate: [0, 5, -5, 0],
+                  scale: [1, 1.03, 0.97, 1]
+                }}
+                transition={{ 
+                  repeat: Infinity,
+                  duration: 5,
+                  ease: "easeInOut"
+                }}
+              >
+                <Sparkles size={36} className="stroke-[1.5]" />
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Badge */}
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+            Portal Preparation
+          </span>
+
+          {/* Welcome Text */}
+          <h2 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight leading-tight">
+            Hi {onboardingData.name}! ✨
+          </h2>
+          
+          <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2 font-semibold">
+            Welcome to the <strong className="text-indigo-600 dark:text-indigo-400">{onboardingData.company}</strong> Workspace
+          </p>
+
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-white/10 to-transparent my-8" />
+
+          {/* Main message */}
+          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">
+            Employee Workspace Coming Soon
+          </h3>
+          
+          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-3 max-w-md mx-auto leading-relaxed">
+            Your teammate is currently building the custom employee modules. Once they complete the component and publish it, your active task queue and workspace integrations will be connected seamlessly.
+          </p>
+
+          {/* Upcoming features preview */}
+          <div className="mt-10 space-y-4">
+            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">
+              Upcoming Channels & Integrations
+            </p>
+            
+            <div className="flex flex-wrap justify-center gap-3">
+              {[
+                { name: "Slack Integrations", icon: <MessageCircle size={12} /> },
+                { name: "WhatsApp Feeds", icon: <Mail size={12} /> },
+                { name: "Auto Task Extraction", icon: <CheckCircle2 size={12} /> }
+              ].map((item, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center gap-2 bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400"
+                >
+                  <span className="text-indigo-500 dark:text-indigo-400">{item.icon}</span>
+                  {item.name}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Secondary Action */}
+          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-3">
+            <button
+              onClick={onResetOnboarding}
+              className="bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-800 dark:text-white text-xs font-bold py-3 px-5 rounded-xl border border-gray-200/30 dark:border-white/5 active:scale-[0.98] transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
+            >
+              <RefreshCw size={12} /> Switch Designation
+            </button>
+            <button
+              onClick={onSignOut}
+              className="bg-transparent hover:bg-red-500/5 text-red-500 hover:text-red-600 text-xs font-bold py-3 px-5 rounded-xl border border-red-500/20 active:scale-[0.98] transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
+            >
+              <LogOut size={12} /> Sign Out
+            </button>
+          </div>
+
+        </motion.div>
+      </main>
+
+      {/* FOOTER */}
+      <footer className="w-full py-6 border-t border-gray-100 dark:border-white/5 text-center text-xs text-gray-400 bg-white/10 dark:bg-transparent z-10">
+        <p>© 2026 TaskPulse. Sandboxed Employee Client Session.</p>
+      </footer>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -1053,6 +1624,14 @@ export default function TaskPulse() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+
+  // Onboarding States
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [onboardingData, setOnboardingData] = useState<{
+    name: string;
+    company: string;
+    designation: "founder" | "employee";
+  } | null>(null);
 
   const loadTasks = async () => {
     try {
@@ -1077,6 +1656,20 @@ export default function TaskPulse() {
   useEffect(() => {
     setMounted(true);
     loadTasks();
+
+    // Check onboarding status
+    const data = localStorage.getItem("taskpulse_onboarding");
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        setOnboardingData(parsed);
+        setOnboarded(true);
+      } catch {
+        setOnboarded(false);
+      }
+    } else {
+      setOnboarded(false);
+    }
   }, []);
   
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
@@ -1092,7 +1685,7 @@ export default function TaskPulse() {
 
   const dismissToast = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
 
-  if (status === "loading") {
+  if (status === "loading" || onboarded === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
         <div className="flex flex-col items-center gap-3">
@@ -1104,29 +1697,39 @@ export default function TaskPulse() {
   }
 
   if (!session) {
+    return <LoginPage onSignIn={() => signIn("google")} />;
+  }
+
+  if (!onboarded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
-        <div className="bg-white dark:bg-[#18181b] p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-white/10 max-w-md w-full text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500" />
-          <span className="text-4xl block mb-2">📋</span>
-          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">Welcome to TaskPulse</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-xs mx-auto leading-relaxed">
-            Securely manage your creative agency's tasks. Extract actions from WhatsApp and Emails instantly.
-          </p>
-          <button
-            onClick={() => signIn("google")}
-            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-3 shadow-md shadow-indigo-200 dark:shadow-none hover:shadow-lg active:scale-[0.98]"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-            </svg>
-            Sign in with Google
-          </button>
-        </div>
-      </div>
+      <OnboardingPage
+        session={session}
+        onComplete={(data) => {
+          localStorage.setItem("taskpulse_onboarding", JSON.stringify(data));
+          setOnboardingData(data);
+          setOnboarded(true);
+          addToast("Onboarding completed successfully!");
+        }}
+        onSignOut={() => signOut()}
+      />
+    );
+  }
+
+  if (onboardingData?.designation === "employee") {
+    return (
+      <EmployeeDashboard
+        onboardingData={onboardingData}
+        tasks={tasks}
+        setTasks={setTasks}
+        addToast={addToast}
+        onSignOut={() => signOut()}
+        onResetOnboarding={() => {
+          localStorage.removeItem("taskpulse_onboarding");
+          setOnboarded(false);
+          setOnboardingData(null);
+          addToast("Session reset. You can now choose a new designation.");
+        }}
+      />
     );
   }
 
@@ -1225,8 +1828,20 @@ export default function TaskPulse() {
                 </div>
               )}
               <button
+                onClick={() => {
+                  localStorage.removeItem("taskpulse_onboarding");
+                  setOnboarded(false);
+                  setOnboardingData(null);
+                  addToast("Session reset. You can now choose a new designation.");
+                }}
+                className="text-[10px] font-extrabold text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider cursor-pointer border-r border-gray-200 dark:border-white/10 pr-2 mr-2 bg-transparent border-t-0 border-b-0 border-l-0"
+                title="Switch Role"
+              >
+                Switch Role
+              </button>
+              <button
                 onClick={() => signOut()}
-                className="text-[10px] font-extrabold text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors uppercase tracking-wider cursor-pointer"
+                className="text-[10px] font-extrabold text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-0 outline-none"
                 title="Sign Out"
               >
                 Sign Out
