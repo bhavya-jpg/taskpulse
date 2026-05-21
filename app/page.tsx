@@ -40,6 +40,7 @@ import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "
 import { MeetingTab } from "@/components/MeetingTab";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,8 @@ interface Task {
   status: Status;
   confidence: number;
   sourceMessage: string;
+  isBlocked?: boolean;
+  blockerNote?: string;
 }
 
 type Tab = "dashboard" | "client" | "employee" | "slack" | "whatsapp" | "email" | "meetings";
@@ -175,17 +178,25 @@ function TaskCard({
   onMarkDone,
   onConfirm,
   onDismiss,
+  onReassign,
+  onToggleBlocker,
   showConfirmButtons = false,
   showFrom = false,
+  isFounder = false,
 }: {
   task: Task;
   onMarkDone?: (id: number | string) => void;
   onConfirm?: (id: number | string) => void;
   onDismiss?: (id: number | string) => void;
+  onReassign?: (id: number | string, newAssignee: string) => void;
+  onToggleBlocker?: (id: number | string, isBlocked: boolean, note?: string) => void;
   showConfirmButtons?: boolean;
   showFrom?: boolean;
+  isFounder?: boolean;
 }) {
   const [showSource, setShowSource] = useState(false);
+  const [showBlockerModal, setShowBlockerModal] = useState(false);
+  const [tempNote, setTempNote] = useState(task.blockerNote || "");
   const pc = PRIORITY_CONFIG[task.priority];
   const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100 dark:bg-gray-900/40", text: "text-gray-700 dark:text-gray-300", border: "border-gray-300 dark:border-white/10" };
   const overdue = isOverdue(task.deadline) && task.status !== "done";
@@ -196,9 +207,9 @@ function TaskCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className="bg-white dark:bg-[#121214] rounded-xl shadow-sm hover:shadow-md border border-gray-200/60 dark:border-white/5 hover:border-indigo-500/20 dark:hover:border-indigo-500/20 hover:scale-[1.01] transition-all duration-300 overflow-hidden group"
+      className={`bg-white dark:bg-[#121214] rounded-xl shadow-sm hover:shadow-md border transition-all duration-300 overflow-hidden group ${task.isBlocked ? "border-red-400 dark:border-red-800" : "border-gray-200/60 dark:border-white/5"} hover:border-indigo-500/20 dark:hover:border-indigo-500/20`}
     >
-      <div className="p-4 flex flex-col gap-3">
+      <div className="p-4 pb-0 flex flex-col gap-3">
         {/* Header: Client, Priority & Custom Platform Badges */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5 items-center">
@@ -244,11 +255,24 @@ function TaskCard({
             </span>
           )}
         </div>
+      </div>
 
+      <div className="p-4 pt-0 flex flex-col gap-3">
         {/* Title */}
         <h4 className={`font-semibold text-[14px] leading-snug text-gray-800 dark:text-gray-100 ${task.status === "done" ? "line-through text-gray-400 dark:text-gray-600" : ""}`}>
           {task.title}
         </h4>
+
+        {/* Blocker alert note */}
+        {task.isBlocked && (
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg p-2.5 flex items-start gap-2 text-xs text-red-800 dark:text-red-300 font-medium">
+            <span className="text-sm flex-shrink-0">⚠️</span>
+            <div className="flex-1 min-w-0">
+              <span className="font-extrabold uppercase text-[10px] text-red-600 dark:text-red-400 block mb-0.5">Blocker / Clarification Request</span>
+              <p className="italic text-[11px] leading-relaxed break-words">"{task.blockerNote}"</p>
+            </div>
+          </div>
+        )}
 
         {/* Info row: Assignee & Date */}
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -256,7 +280,19 @@ function TaskCard({
             <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
               <User size={10} className="text-indigo-600 dark:text-indigo-400" />
             </div>
-            <span className="font-semibold text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
+            {isFounder && onReassign ? (
+              <select
+                value={task.assignedTo}
+                onChange={(e) => onReassign?.(task.id, e.target.value)}
+                className="bg-indigo-50/80 dark:bg-[#1a1a1f] border border-indigo-200/50 dark:border-white/10 rounded-lg px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-indigo-500 font-bold cursor-pointer transition-colors"
+              >
+                {EMPLOYEES.map((emp) => (
+                  <option key={emp} value={emp}>{emp}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <Calendar size={11} className={overdue ? "text-red-500 dark:text-red-400" : "text-gray-400"} />
@@ -285,7 +321,7 @@ function TaskCard({
         <div className="border-t border-gray-100 dark:border-white/5 pt-3 mt-1">
           <button
             onClick={() => setShowSource((p) => !p)}
-            className="flex items-center justify-between w-full text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-bold transition-colors"
+            className="flex items-center justify-between w-full text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-bold transition-colors animate-none bg-transparent border-none outline-none cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
               {showSource ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -313,31 +349,85 @@ function TaskCard({
           </AnimatePresence>
         </div>
 
+        {/* Inline Blocker Entry Modal / Textarea */}
+        <AnimatePresence>
+          {showBlockerModal && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-red-50/50 dark:bg-red-950/10 border border-red-200/50 dark:border-red-900/25 rounded-xl p-3 flex flex-col gap-2 overflow-hidden"
+            >
+              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Describe the Blocker / Question</span>
+              <textarea
+                value={tempNote}
+                onChange={(e) => setTempNote(e.target.value)}
+                placeholder="e.g. Missing copy assets from client..."
+                className="w-full bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-lg p-2 text-xs text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-red-500 min-h-[60px] resize-none"
+              />
+              <div className="flex justify-end gap-1.5 mt-1">
+                <button
+                  onClick={() => setShowBlockerModal(false)}
+                  className="px-2.5 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-200/50 dark:hover:bg-white/5 rounded-md cursor-pointer bg-transparent border-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tempNote.trim()) {
+                      onToggleBlocker?.(task.id, true, tempNote.trim());
+                      setShowBlockerModal(false);
+                    }
+                  }}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded-md shadow-sm cursor-pointer border-none"
+                >
+                  Raise Blocker
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Action buttons */}
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-col gap-2 pt-1">
           {showConfirmButtons ? (
-            <>
+            <div className="flex gap-2">
               <button
                 onClick={() => onConfirm?.(task.id)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
               >
                 <CheckCircle2 size={13} /> Accept
               </button>
               <button
                 onClick={() => onDismiss?.(task.id)}
-                className="flex-1 bg-white dark:bg-[#1a1a1f] hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                className="flex-1 bg-white dark:bg-[#1a1a1f] hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
               >
                 <X size={13} /> Reject
               </button>
-            </>
-          ) : task.status === "pending" ? (
-            <button
-              onClick={() => onMarkDone?.(task.id)}
-              className="w-full bg-white dark:bg-[#1a1a1f] hover:bg-green-50 dark:hover:bg-green-500/10 text-gray-600 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-green-500/30 flex items-center justify-center gap-1.5 group-hover:border-green-200/50 dark:group-hover:border-green-500/20 shadow-sm active:scale-[0.98]"
-            >
-              <CheckCircle2 size={13} className="text-green-600 dark:text-green-500 group-hover:scale-110 transition-transform" /> Mark as Done
-            </button>
-          ) : null}
+            </div>
+          ) : (
+            task.status !== "done" && (
+              <div className="flex flex-col gap-1.5">
+                {onMarkDone && (
+                  <button
+                    onClick={() => onMarkDone?.(task.id)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+                  >
+                    <CheckCircle2 size={13} /> Mark as Done
+                  </button>
+                )}
+                {!isFounder && onToggleBlocker && (
+                  <button
+                    onClick={() => setShowBlockerModal(true)}
+                    className="w-full bg-white dark:bg-[#1a1a1f] hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-red-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                  >
+                    ⚠️ {task.isBlocked ? "Update Blocker" : "Report Blocker / Clarify"}
+                  </button>
+                )}
+              </div>
+            )
+          )}
         </div>
       </div>
     </motion.div>
@@ -373,16 +463,178 @@ function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: 
 
 // ─── VIEW: DASHBOARD ─────────────────────────────────────────────────────────
 
+// ─── MANUAL TASK CREATOR ──────────────────────────────────────────────────────
+
+function ManualTaskCreator({
+  onAddTask,
+}: {
+  onAddTask: (task: {
+    title: string;
+    client: string;
+    assignedTo: string;
+    deadline: string;
+    priority: Priority;
+  }) => Promise<void>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [client, setClient] = useState(CLIENTS[0]);
+  const [assignedTo, setAssignedTo] = useState(EMPLOYEES[0]);
+  const [deadline, setDeadline] = useState("");
+  const [priority, setPriority] = useState<Priority>("Medium");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !deadline) return;
+
+    setSubmitting(true);
+    try {
+      await onAddTask({ title, client, assignedTo, deadline, priority });
+      setTitle("");
+      setDeadline("");
+      setIsOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-[#121214] border border-gray-200/60 dark:border-white/5 rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">✨</span>
+          <h3 className="font-extrabold text-gray-800 dark:text-gray-100 text-sm">Manual Task Planner</h3>
+        </div>
+        <button
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-755 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer border-none flex items-center gap-1 animate-none outline-none"
+        >
+          {isOpen ? "Close Creator" : "Create New Task"}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.form
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-4 overflow-hidden border-t border-gray-100 dark:border-white/5 pt-4"
+          >
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Task Title</label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Design homepage mockup for Amazon..."
+                className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Client</label>
+                <select
+                  value={client}
+                  onChange={(e) => setClient(e.target.value)}
+                  className="bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none cursor-pointer font-bold"
+                >
+                  {CLIENTS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Assignee</label>
+                <select
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  className="bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none cursor-pointer font-bold"
+                >
+                  {EMPLOYEES.map((e) => (
+                    <option key={e} value={e}>{e}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Priority</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className="bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-350 outline-none cursor-pointer font-extrabold text-indigo-600 dark:text-indigo-400"
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Deadline</label>
+                <input
+                  type="date"
+                  required
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className="bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-gray-50 dark:border-white/5 pt-3">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer border-none flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin text-white" /> Publishing...
+                  </>
+                ) : (
+                  <>
+                    <Send size={12} /> Publish Deliverable
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── VIEW: DASHBOARD ─────────────────────────────────────────────────────────
+
 function DashboardView({
   tasks,
   onMarkDone,
   onConfirm,
   onDismiss,
+  onReassign,
+  onAddTask,
+  resolveBlocker,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
   onConfirm: (id: number | string) => void;
   onDismiss: (id: number | string) => void;
+  onReassign: (id: number | string, newAssignee: string) => void;
+  onAddTask: (task: {
+    title: string;
+    client: string;
+    assignedTo: string;
+    deadline: string;
+    priority: Priority;
+  }) => Promise<void>;
+  resolveBlocker: (id: number | string) => Promise<void>;
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
 
@@ -414,13 +666,67 @@ function DashboardView({
         <div className="relative z-10 w-full">
           <h2 className="text-2xl font-bold mb-3 flex items-center gap-2">
             <Sparkles size={24} className="text-yellow-300 animate-pulse" />
-            Agency Control Center
+            Founder Control Center
           </h2>
-          <p className="text-indigo-100 dark:text-indigo-200/80 text-sm md:text-base max-w-3xl leading-relaxed">
-            Welcome to your executive console. TaskPulse scans your Slack channels and Gmail inboxes, applying Gemini AI logic to automatically structure client deliverables. Filter by channel below, drag and drop, and oversee performance instantly.
+          <p className="text-indigo-100 dark:text-indigo-200/80 text-sm md:text-base max-w-3xl leading-relaxed font-medium">
+            Welcome to your executive console. TaskPulse scans your Slack channels and Gmail inboxes, applying Gemini AI logic to automatically structure client deliverables. Filter by channel below, reassign to team members instantly, and oversee performance.
           </p>
         </div>
       </div>
+
+      {/* Active Blocker Warning Panel */}
+      {tasks.some((t) => t.isBlocked) && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50/95 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-2xl p-5 shadow-sm"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">⚠️</span>
+            <h3 className="font-extrabold text-red-800 dark:text-red-300 text-xs uppercase tracking-wider">
+              Active Employee Blockers ({tasks.filter((t) => t.isBlocked).length})
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {tasks
+              .filter((t) => t.isBlocked)
+              .map((task) => (
+                <div
+                  key={task.id}
+                  className="bg-white dark:bg-[#121214] border border-red-200 dark:border-red-900/35 rounded-xl p-3 flex flex-col justify-between gap-2.5 shadow-sm"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                        {task.client}
+                      </span>
+                      <span className="text-[10px] font-extrabold text-gray-500 dark:text-gray-400">
+                        Assignee: <strong className="text-gray-700 dark:text-gray-300">{task.assignedTo}</strong>
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200 line-clamp-1 mb-1">
+                      {task.title}
+                    </h4>
+                    <p className="text-[11px] italic text-red-650 dark:text-red-400 bg-red-50/50 dark:bg-red-950/10 p-2.5 rounded-lg border border-red-100/55 dark:border-red-950/30">
+                      "{task.blockerNote}"
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-1">
+                    <button
+                      onClick={() => resolveBlocker(task.id)}
+                      className="px-3 py-1 text-[10px] font-bold text-white bg-red-650 hover:bg-red-750 rounded-lg shadow-sm transition-all cursor-pointer border-none"
+                    >
+                      Resolve Blocker
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Manual Task Creator */}
+      <ManualTaskCreator onAddTask={onAddTask} />
 
       {/* Segmented Filter Control */}
       <div className="flex justify-between items-center bg-white dark:bg-[#121214] p-3 rounded-2xl border border-gray-200/60 dark:border-white/5 shadow-sm">
@@ -470,7 +776,7 @@ function DashboardView({
                 <EmptyState message="All suggestions reviewed! 🎉" />
               ) : (
                 unconfirmed.map((t) => (
-                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} />
+                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} />
                 ))
               )}
             </AnimatePresence>
@@ -496,7 +802,7 @@ function DashboardView({
                 <EmptyState message="All tasks caught up! 🎉" />
               ) : (
                 sorted.map((t) => (
-                  <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
+                  <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onReassign={onReassign} />
                 ))
               )}
             </AnimatePresence>
@@ -522,7 +828,7 @@ function DashboardView({
                 <EmptyState message="No tasks done yet." />
               ) : (
                 done.map((t) => (
-                  <TaskCard key={t.id} task={t} />
+                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} />
                 ))
               )}
             </AnimatePresence>
@@ -1621,6 +1927,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function TaskPulse() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -1632,6 +1939,12 @@ export default function TaskPulse() {
     company: string;
     designation: "founder" | "employee";
   } | null>(null);
+
+  useEffect(() => {
+    if (onboarded && onboardingData?.designation === "employee") {
+      router.push("/employee");
+    }
+  }, [onboarded, onboardingData, router]);
 
   const loadTasks = async () => {
     try {
@@ -1717,19 +2030,29 @@ export default function TaskPulse() {
 
   if (onboardingData?.designation === "employee") {
     return (
-      <EmployeeDashboard
-        onboardingData={onboardingData}
-        tasks={tasks}
-        setTasks={setTasks}
-        addToast={addToast}
-        onSignOut={() => signOut()}
-        onResetOnboarding={() => {
-          localStorage.removeItem("taskpulse_onboarding");
-          setOnboarded(false);
-          setOnboardingData(null);
-          addToast("Session reset. You can now choose a new designation.");
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center bg-[#030303] text-gray-100 selection:bg-indigo-500 selection:text-white font-sans relative overflow-hidden">
+        {/* Background Mesh Orbs */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-indigo-600/10 blur-[80px] animate-pulse pointer-events-none" />
+        
+        <div className="flex flex-col items-center gap-4 relative z-10 text-center px-4 max-w-sm">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+          <h2 className="text-xl font-bold tracking-tight text-white mt-2">Redirecting to Employee Console</h2>
+          <p className="text-xs text-gray-450 leading-relaxed">
+            Please wait while we route your authenticated session to the dedicated `/employee` workspace...
+          </p>
+          <button
+            onClick={() => {
+              localStorage.removeItem("taskpulse_onboarding");
+              setOnboarded(false);
+              setOnboardingData(null);
+              router.push("/");
+            }}
+            className="mt-4 text-[10px] font-extrabold text-indigo-500 hover:text-indigo-400 uppercase tracking-widest cursor-pointer hover:underline"
+          >
+            ← Reset Designation & Stay Here
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -1775,6 +2098,71 @@ export default function TaskPulse() {
           body: JSON.stringify({ id, status: "dismissed" }),
         });
       } catch {}
+    }
+  };
+
+  const reassignTask = async (id: number | string, newAssignee: string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, assignedTo: newAssignee } : t));
+    addToast(`Task reassigned to ${newAssignee}!`);
+
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, assignee: newAssignee }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const resolveBlocker = async (id: number | string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, isBlocked: false, blockerNote: "" } : t));
+    addToast("Blocker resolved!");
+
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, isBlocked: false, blockerNote: "" }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const addTask = async (newTaskData: {
+    title: string;
+    client: string;
+    assignedTo: string;
+    deadline: string;
+    priority: Priority;
+  }) => {
+    const tempId = "task-" + Date.now();
+    const newTask: Task = {
+      ...newTaskData,
+      id: tempId,
+      source: "slack",
+      sourceGroup: "#manual-tasks",
+      status: "pending",
+      confidence: 100,
+      sourceMessage: "Manually entered task by Founder.",
+    };
+
+    setTasks((prev) => [newTask, ...prev]);
+    addToast("New task published!");
+
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTask),
+      });
+      if (res.ok) {
+        loadTasks();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -1900,6 +2288,9 @@ export default function TaskPulse() {
                 onMarkDone={markDone}
                 onConfirm={confirmTask}
                 onDismiss={dismissTask}
+                onReassign={reassignTask}
+                onAddTask={addTask}
+                resolveBlocker={resolveBlocker}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
