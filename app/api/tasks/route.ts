@@ -5,13 +5,14 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { data: dbTasks, error } = await supabaseAdmin
       .from("tasks")
       .select("*")
-      .eq("user_id", session.user.id)
+      .eq("user_id", (session.user as any).id)
+      .neq("status", "dismissed")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
       source: t.source_platform || "whatsapp",
       sourceGroup: t.source_group_name || "General Chat",
       status: t.status === "done" ? "done" : "pending",
-      confidence: t.confidence || 100,
+      confidence: t.status === "unconfirmed" ? 80 : (t.status === "confirmed" ? 95 : (t.confidence || 100)),
       sourceMessage: t.source_message_text || "",
     }));
 
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { id, status } = await req.json();
@@ -49,7 +50,7 @@ export async function PUT(req: NextRequest) {
       .from("tasks")
       .update({ status })
       .eq("id", id)
-      .eq("user_id", session.user.id);
+      .eq("user_id", (session.user as any).id);
 
     if (error) throw error;
 

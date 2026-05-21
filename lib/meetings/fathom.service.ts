@@ -114,79 +114,108 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
     console.error("Error checking existing fathom meeting:", checkError);
   }
 
+  let insertedMeeting = existingMeeting;
+  let alreadyExisted = false;
+
   if (existingMeeting) {
     console.log(`Meeting already ingested (ID: ${existingMeeting.id})`);
-    return { meeting: existingMeeting, alreadyExisted: true, tasksCreated: 0 };
-  }
+    
+    // Check if tasks exist for this meeting
+    const { data: existingTasks, error: tasksError } = await supabaseAdmin
+      .from("tasks")
+      .select("id")
+      .eq("meeting_id", existingMeeting.id);
+      
+    if (tasksError) {
+      console.error("Error checking tasks for existing meeting:", tasksError);
+    }
+    
+    if (!tasksError && existingTasks && existingTasks.length > 0) {
+      // If tasks already exist, skip extraction to avoid duplicate tasks
+      return { meeting: existingMeeting, alreadyExisted: true, tasksCreated: 0 };
+    }
+    
+    // If no tasks exist, we will proceed to task extraction using the existing meeting
+    alreadyExisted = true;
+  } else {
+    // 2. Prepare meeting object
+    const rawTranscript = formatFathomTranscript(fathomMeeting.transcript);
+    const summaryMarkdown = fathomMeeting.default_summary?.markdown_formatted || fathomMeeting.default_summary?.text || "";
 
-  // 2. Prepare meeting object
-  const rawTranscript = formatFathomTranscript(fathomMeeting.transcript);
-  const summaryMarkdown = fathomMeeting.default_summary?.markdown_formatted || fathomMeeting.default_summary?.text || "";
-
-  // Attempt to parse out some decisions/topics from the summary if available
-  const decisions: any[] = [];
-  const keyTopics: string[] = [];
-  
-  if (summaryMarkdown) {
-    // Simple regex or line analysis to populate key topics if empty
-    const lines = summaryMarkdown.split("\n");
-    for (const line of lines) {
-      const cleanLine = line.trim();
-      if (cleanLine.startsWith("-") || cleanLine.startsWith("*")) {
-        const item = cleanLine.substring(1).trim();
-        if (item.length > 5 && item.length < 100 && decisions.length < 5) {
-          decisions.push({ decision: item, context: "" });
+    // Attempt to parse out some decisions/topics from the summary if available
+    const decisions: any[] = [];
+    const keyTopics: string[] = [];
+    
+    if (summaryMarkdown) {
+      // Simple regex or line analysis to populate key topics if empty
+      const lines = summaryMarkdown.split("\n");
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (cleanLine.startsWith("-") || cleanLine.startsWith("*")) {
+          const item = cleanLine.substring(1).trim();
+          if (item.length > 5 && item.length < 100 && decisions.length < 5) {
+            decisions.push({ decision: item, context: "" });
+          }
         }
       }
     }
-  }
 
-  const meetingData = {
-    user_id: userId,
-    title: meetingTitle,
-    platform: "fathom",
-    meeting_date: meetingDate,
-    transcript_url: shareUrl,
-    summary: summaryMarkdown,
-    raw_transcript: rawTranscript,
-    key_topics: keyTopics.length > 0 ? keyTopics : ["Fathom Integration", "Meeting Notes"],
-    decisions: decisions.length > 0 ? decisions : [{ decision: "Fathom meeting notes successfully captured.", context: "" }],
-  };
+    const meetingData = {
+      user_id: userId,
+      title: meetingTitle,
+      platform: "fathom",
+      meeting_date: meetingDate,
+      transcript_url: shareUrl,
+      summary: summaryMarkdown,
+      raw_transcript: rawTranscript,
+      key_topics: keyTopics.length > 0 ? keyTopics : ["Fathom Integration", "Meeting Notes"],
+      decisions: decisions.length > 0 ? decisions : [{ decision: "Fathom meeting notes successfully captured.", context: "" }],
+    };
 
-  // 3. Insert meeting into database with platform constraint retry fallback
-  let meetingInsertResult = await supabaseAdmin
-    .from("meetings")
-    .insert(meetingData)
-    .select()
-    .single();
+    // 3. Insert meeting into database with platform constraint retry fallback
+    let meetingInsertResult = await supabaseAdmin
+      .from("meetings")
+      .insert(meetingData)
+      .select()
+      .single();
 
-  if (meetingInsertResult.error) {
-    const errorMsg = meetingInsertResult.error.message;
-    // Check if it's a check constraint error on the platform column
-    if (errorMsg.includes("platform") || errorMsg.includes("meetings_platform_check")) {
-      console.warn("Fathom platform CHECK constraint failed in database. Retrying with platform 'manual' fallback.");
-      const fallbackMeetingData = {
-        ...meetingData,
-        platform: "manual" as any, // fallback to manual platform
-      };
-      meetingInsertResult = await supabaseAdmin
-        .from("meetings")
-        .insert(fallbackMeetingData)
-        .select()
-        .single();
+    if (meetingInsertResult.error) {
+      const errorMsg = meetingInsertResult.error.message;
+      // Check if it's a check constraint error on the platform column
+      if (errorMsg.includes("platform") || errorMsg.includes("meetings_platform_check")) {
+        console.warn("Fathom platform CHECK constraint failed in database. Retrying with platform 'manual' fallback.");
+        const fallbackMeetingData = {
+          ...meetingData,
+          platform: "manual" as any, // fallback to manual platform
+        };
+        meetingInsertResult = await supabaseAdmin
+          .from("meetings")
+          .insert(fallbackMeetingData)
+          .select()
+          .single();
+      }
     }
+
+    if (meetingInsertResult.error) {
+      throw new Error(`Failed to insert fathom meeting into database: ${meetingInsertResult.error.message}`);
+    }
+
+    insertedMeeting = meetingInsertResult.data;
   }
 
-  if (meetingInsertResult.error) {
-    throw new Error(`Failed to insert fathom meeting into database: ${meetingInsertResult.error.message}`);
+  if (!insertedMeeting) {
+    throw new Error("Failed to insert or find fathom meeting");
   }
 
-  const insertedMeeting = meetingInsertResult.data;
+  const summaryMarkdown = fathomMeeting.default_summary?.markdown_formatted || fathomMeeting.default_summary?.text || "";
   let tasksCreatedCount = 0;
 
   // 4. Ingest action items as unconfirmed tasks
+  const taskTitles = new Set<string>();
+
   if (fathomMeeting.action_items && Array.isArray(fathomMeeting.action_items)) {
     for (const item of fathomMeeting.action_items) {
+      taskTitles.add(item.description.trim().toLowerCase());
       const task = {
         user_id: userId,
         title: item.description,
@@ -215,9 +244,100 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
     }
   }
 
+  // Smart fallback: Extract any inline tasks from summary text
+  if (summaryMarkdown) {
+    const lines = summaryMarkdown.split("\n");
+    let insideTaskSection = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Track headers
+      if (trimmed.startsWith("#")) {
+        const lowerHeader = trimmed.toLowerCase();
+        insideTaskSection = lowerHeader.includes("task") || lowerHeader.includes("takeaway") || lowerHeader.includes("next step");
+        continue;
+      }
+
+      let parsedTitle = "";
+      let parsedUrl = shareUrl;
+
+      // Match bold task lists: e.g. - [**New Task:** Description](URL) or - [**Bhavya to do X**](URL)
+      const boldMatch = trimmed.match(/[-*]\s*\[\*\*New\s+Task:\*\*\s*([^\]]+)\]\(([^)]+)\)/i) || 
+                        trimmed.match(/[-*]\s*\[\*\*(?:[^:]+):\*\*\s*([^\]]+)\]\(([^)]+)\)/i) ||
+                        trimmed.match(/[-*]\s*\[\*\*([^\]]+)\*\*\]\(([^)]+)\)/i);
+      
+      if (boldMatch) {
+        parsedTitle = boldMatch[1].trim();
+        parsedUrl = boldMatch[2].trim();
+      } else {
+        // Match general bullet points like - **New Task:** Description
+        const generalMatch = trimmed.match(/[-*]\s*\*\*New\s+Task:\*\*\s*(.*)/i) ||
+                             trimmed.match(/[-*]\s*\*\*(?:[^:]+):\*\*\s*(.*)/i);
+        if (generalMatch) {
+          parsedTitle = generalMatch[1].replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1").trim();
+        } else if (insideTaskSection) {
+          // Match numbered lists under task sections: 1. [Description](URL)
+          const numMatch = trimmed.match(/^\d+\.\s*\[([^\]]+)\]\(([^)]+)\)/);
+          if (numMatch) {
+            parsedTitle = numMatch[1].trim();
+            parsedUrl = numMatch[2].trim();
+          } else {
+            const simpleNumMatch = trimmed.match(/^\d+\.\s*(.*)/);
+            if (simpleNumMatch && simpleNumMatch[1].length > 5) {
+              parsedTitle = simpleNumMatch[1].replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1").trim();
+            }
+          }
+        }
+      }
+
+      if (parsedTitle && parsedTitle.length > 5 && parsedTitle.length < 150) {
+        const lowerTitle = parsedTitle.toLowerCase();
+        // Skip duplicates or generic text
+        if (!taskTitles.has(lowerTitle) && !lowerTitle.includes("assign new tasks")) {
+          taskTitles.add(lowerTitle);
+
+          // Extract assignee if mentioned, e.g., "Bhavya to integrate..." -> Bhavya
+          let assignee = "Unassigned";
+          const assigneeMatch = parsedTitle.match(/^(Bhavya|Saurabh|Priya|Rahul|John)/i);
+          if (assigneeMatch) {
+            assignee = assigneeMatch[1];
+          }
+
+          const fallbackTask = {
+            user_id: userId,
+            title: parsedTitle,
+            priority: "Medium" as const,
+            deadline: null,
+            assignee: assignee,
+            confidence: 90, // AI fallback extraction
+            status: "unconfirmed" as const,
+            source_platform: "fathom",
+            source_group_name: meetingTitle,
+            source_message_text: `Extracted from Fathom Summary. Playback Link: ${parsedUrl}`,
+            source_timestamp: meetingDate,
+            meeting_id: insertedMeeting.id,
+            source_quote: parsedUrl,
+          };
+
+          const { error: fallbackError } = await supabaseAdmin
+            .from("tasks")
+            .insert(fallbackTask);
+
+          if (fallbackError) {
+            console.error("Error inserting fallback fathom task:", fallbackError);
+          } else {
+            tasksCreatedCount++;
+          }
+        }
+      }
+    }
+  }
+
   return {
     meeting: insertedMeeting,
-    alreadyExisted: false,
+    alreadyExisted: alreadyExisted && tasksCreatedCount === 0,
     tasksCreated: tasksCreatedCount,
   };
 }

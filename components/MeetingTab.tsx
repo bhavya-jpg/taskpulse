@@ -15,6 +15,160 @@ interface Meeting {
   transcript_url?: string;
 }
 
+function formatMarkdown(text: string) {
+  if (!text) return null;
+
+  // Helper to parse inline elements: bold (**text**) and links ([text](url))
+  const parseInline = (lineText: string) => {
+    let tokens: Array<{ type: 'text' | 'bold' | 'link'; content: string; url?: string }> = [
+      { type: 'text', content: lineText }
+    ];
+
+    // 1. Process bold first:
+    let newTokens: typeof tokens = [];
+    for (const token of tokens) {
+      if (token.type === 'text') {
+        const parts = token.content.split(/\*\*([^*]+)\*\*/);
+        for (let i = 0; i < parts.length; i++) {
+          if (i % 2 === 1) {
+            newTokens.push({ type: 'bold', content: parts[i] });
+          } else if (parts[i]) {
+            newTokens.push({ type: 'text', content: parts[i] });
+          }
+        }
+      } else {
+        newTokens.push(token);
+      }
+    }
+    tokens = newTokens;
+
+    // 2. Process links:
+    newTokens = [];
+    for (const token of tokens) {
+      if (token.type === 'text' || token.type === 'bold') {
+        const parts = token.content.split(/\[([^\]]+)\]\(([^)]+)\)/);
+        for (let i = 0; i < parts.length; i += 3) {
+          if (parts[i]) {
+            newTokens.push({ type: token.type, content: parts[i] });
+          }
+          if (i + 1 < parts.length) {
+            const linkText = parts[i + 1];
+            const linkUrl = parts[i + 2];
+            newTokens.push({ type: 'link', content: linkText, url: linkUrl });
+          }
+        }
+      } else {
+        newTokens.push(token);
+      }
+    }
+    tokens = newTokens;
+
+    return tokens.map((token, idx) => {
+      if (token.type === 'bold') {
+        return <strong key={idx} className="font-bold text-gray-900 dark:text-white">{token.content}</strong>;
+      }
+      if (token.type === 'link') {
+        return (
+          <a
+            key={idx}
+            href={token.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 underline font-medium inline-flex items-center gap-0.5 hover:opacity-90 transition-opacity"
+          >
+            {token.content}
+          </a>
+        );
+      }
+      return <span key={idx}>{token.content}</span>;
+    });
+  };
+
+  const lines = text.split("\n");
+  let inList = false;
+  let listItems: React.ReactNode[] = [];
+  const elements: React.ReactNode[] = [];
+
+  const pushList = (key: number) => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`list-${key}`} className="list-disc pl-5 my-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+      inList = false;
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      pushList(idx);
+      return;
+    }
+
+    if (trimmed.startsWith("### ")) {
+      pushList(idx);
+      elements.push(
+        <h4 key={idx} className="text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider mt-4 mb-2">
+          {parseInline(trimmed.substring(4))}
+        </h4>
+      );
+    } else if (trimmed.startsWith("## ")) {
+      pushList(idx);
+      elements.push(
+        <h3 key={idx} className="text-base font-extrabold text-gray-800 dark:text-gray-100 mt-5 mb-3 border-b border-gray-100 dark:border-white/5 pb-1">
+          {parseInline(trimmed.substring(3))}
+        </h3>
+      );
+    } else if (trimmed.startsWith("# ")) {
+      pushList(idx);
+      elements.push(
+        <h2 key={idx} className="text-lg font-black text-gray-900 dark:text-white mt-6 mb-4">
+          {parseInline(trimmed.substring(2))}
+        </h2>
+      );
+    }
+    // List items starting with '-' or '*'
+    else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      inList = true;
+      const content = trimmed.substring(2);
+      listItems.push(
+        <li key={idx} className="leading-relaxed">
+          {parseInline(content)}
+        </li>
+      );
+    }
+    // Numbered list items starting with digit + dot
+    else if (/^\d+\.\s/.test(trimmed)) {
+      pushList(idx);
+      const match = trimmed.match(/^(\d+)\.\s(.*)/);
+      if (match) {
+        elements.push(
+          <div key={idx} className="flex gap-2 text-sm text-gray-600 dark:text-gray-300 my-1.5 pl-2 leading-relaxed">
+            <span className="font-bold text-violet-500 flex-shrink-0">{match[1]}.</span>
+            <div>{parseInline(match[2])}</div>
+          </div>
+        );
+      }
+    }
+    // Paragraph
+    else {
+      pushList(idx);
+      elements.push(
+        <p key={idx} className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed my-2">
+          {parseInline(trimmed)}
+        </p>
+      );
+    }
+  });
+
+  pushList(lines.length);
+
+  return <div className="space-y-1">{elements}</div>;
+}
+
 export function MeetingTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -294,9 +448,9 @@ export function MeetingTab() {
                   <div className="py-4 space-y-4">
                     <div>
                       <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Summary</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">
-                        {meeting.summary}
-                      </p>
+                      <div className="mb-3">
+                        {formatMarkdown(meeting.summary)}
+                      </div>
                       {meeting.transcript_url && (
                         <div className="pt-1">
                           <a
