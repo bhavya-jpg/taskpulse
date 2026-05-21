@@ -130,7 +130,7 @@ function hasTaskKeywords(subject: string, snippet: string): boolean {
 
 // ─── API Route ────────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -145,10 +145,11 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated. Please connect Gmail." }, { status: 401 })
   }
 
+  const origin = new URL(request.url).origin
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "http://localhost:3000/api/auth/callback"
+    `${origin}/api/auth/callback`
   )
 
   auth.setCredentials({

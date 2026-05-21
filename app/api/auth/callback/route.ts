@@ -2,10 +2,11 @@ import { google } from "googleapis"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
+  const origin = new URL(request.url).origin
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "http://localhost:3000/api/auth/callback"
+    `${origin}/api/auth/callback`
   )
 
   const url = new URL(request.url)
