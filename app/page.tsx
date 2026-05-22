@@ -34,6 +34,7 @@ import {
   ChevronRight,
   RefreshCw,
   LogOut,
+  Undo,
 } from "lucide-react";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
@@ -181,6 +182,7 @@ function TaskCard({
   onDismiss,
   onReassign,
   onToggleBlocker,
+  onSendToReview,
   showConfirmButtons = false,
   showFrom = false,
   isFounder = false,
@@ -191,6 +193,7 @@ function TaskCard({
   onDismiss?: (id: number | string) => void;
   onReassign?: (id: number | string, newAssignee: string) => void;
   onToggleBlocker?: (id: number | string, isBlocked: boolean, note?: string) => void;
+  onSendToReview?: (id: number | string) => void;
   showConfirmButtons?: boolean;
   showFrom?: boolean;
   isFounder?: boolean;
@@ -418,6 +421,14 @@ function TaskCard({
                     <CheckCircle2 size={13} /> Mark as Done
                   </button>
                 )}
+                {isFounder && onSendToReview && (
+                  <button
+                    onClick={() => onSendToReview?.(task.id)}
+                    className="w-full bg-white dark:bg-[#1a1a1f] hover:bg-amber-50 dark:hover:bg-amber-500/10 text-gray-600 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 dark:hover:border-amber-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                  >
+                    <Undo size={13} className="text-amber-500 dark:text-amber-400" /> Send back to review
+                  </button>
+                )}
                 {!isFounder && onToggleBlocker && (
                   <button
                     onClick={() => setShowBlockerModal(true)}
@@ -622,6 +633,7 @@ function DashboardView({
   onReassign,
   onAddTask,
   resolveBlocker,
+  onSendToReview,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
@@ -636,6 +648,7 @@ function DashboardView({
     priority: Priority;
   }) => Promise<void>;
   resolveBlocker: (id: number | string) => Promise<void>;
+  onSendToReview: (id: number | string) => void;
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
 
@@ -803,7 +816,14 @@ function DashboardView({
                 <EmptyState message="All tasks caught up! 🎉" />
               ) : (
                 sorted.map((t) => (
-                  <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onReassign={onReassign} />
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    onMarkDone={onMarkDone}
+                    isFounder={true}
+                    onReassign={onReassign}
+                    onSendToReview={onSendToReview}
+                  />
                 ))
               )}
             </AnimatePresence>
@@ -2269,6 +2289,21 @@ export default function TaskPulse() {
     }
   };
 
+  const sendTaskToReview = async (id: number | string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 80 } : t));
+    addToast("Task sent back to review!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "unconfirmed" }),
+        });
+      } catch {}
+    }
+  };
+
   const dismissTask = async (id: number | string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     addToast("Task dismissed.");
@@ -2474,6 +2509,7 @@ export default function TaskPulse() {
                 onReassign={reassignTask}
                 onAddTask={addTask}
                 resolveBlocker={resolveBlocker}
+                onSendToReview={sendTaskToReview}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
