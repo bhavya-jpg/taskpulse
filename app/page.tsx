@@ -59,6 +59,7 @@ interface Task {
   status: Status;
   confidence: number;
   sourceMessage: string;
+  sourceMessageId?: string | null;
 }
 
 type Tab = "dashboard" | "client" | "employee" | "slack" | "whatsapp" | "email" | "meetings";
@@ -692,15 +693,48 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
 function EmailView({ 
   onToast, 
   loadTasks, 
-  setActiveTab 
+  setActiveTab,
+  tasks 
 }: { 
   onToast: (msg: string) => void;
   loadTasks: () => Promise<void>;
   setActiveTab: (tab: Tab) => void;
+  tasks: Task[];
 }) {
-  const [selected, setSelected] = useState(1);
+  interface GmailEmail {
+    id: string;
+    subject: string;
+    fromName: string;
+    fromEmail: string;
+    date: string;
+    snippet: string;
+    isUnread: boolean;
+  }
+
+  const [emails, setEmails] = useState<GmailEmail[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+
+  // Helper for generating deterministic premium pastel colors for initial circles
+  const getAvatarStyle = (name: string) => {
+    const colors = [
+      { bg: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300", border: "border-blue-100 dark:border-blue-900/30" },
+      { bg: "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300", border: "border-rose-100 dark:border-rose-900/30" },
+      { bg: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300", border: "border-emerald-100 dark:border-emerald-900/30" },
+      { bg: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300", border: "border-amber-100 dark:border-amber-900/30" },
+      { bg: "bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300", border: "border-purple-100 dark:border-purple-900/30" },
+      { bg: "bg-cyan-50 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-300", border: "border-cyan-100 dark:border-cyan-900/30" },
+      { bg: "bg-pink-50 text-pink-600 dark:bg-pink-950/40 dark:text-pink-300", border: "border-pink-100 dark:border-pink-900/30" },
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
 
   // Check if Gmail is connected on mount
   useEffect(() => {
@@ -709,33 +743,40 @@ function EmailView({
       .find((row) => row.startsWith("gmail_email="));
     if (emailCookie) {
       const email = decodeURIComponent(emailCookie.split("=")[1]);
-      if (email) setConnectedEmail(email);
+      if (email) {
+        setConnectedEmail(email);
+        fetchRawEmails();
+      }
     }
   }, []);
 
   const disconnectGmail = () => {
     document.cookie = "gmail_token=; Path=/; Max-Age=0";
     document.cookie = "gmail_email=; Path=/; Max-Age=0";
+    document.cookie = "gmail_refresh_token=; Path=/; Max-Age=0";
     setConnectedEmail(null);
+    setEmails([]);
+    setSelectedId(null);
     onToast("Gmail disconnected.");
   };
 
-  const fetchRealEmails = async () => {
+  const fetchRawEmails = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/gmail");
+      const res = await fetch("/api/gmail/inbox");
       if (res.status === 401) {
-        onToast("Not authenticated. Please connect Gmail first.");
+        disconnectGmail();
         setLoading(false);
         return;
       }
       const data = await res.json();
-      if (data.tasks) {
-        await loadTasks();
-        setActiveTab("dashboard");
-        onToast(`Successfully extracted ${data.tasks.length} tasks from real Gmail!`);
+      if (data.emails) {
+        setEmails(data.emails);
+        if (data.emails.length > 0 && !selectedId) {
+          setSelectedId(data.emails[0].id);
+        }
       } else if (data.error) {
-        onToast(`Error: ${data.error}. ${data.details || ""}`);
+        onToast(`Error: ${data.error}`);
       }
     } catch (e) {
       onToast("Failed to fetch emails.");
@@ -743,14 +784,41 @@ function EmailView({
     setLoading(false);
   };
 
-  const email = EMAILS.find((e) => e.id === selected)!;
-  const cc = email.client ? CLIENT_COLORS[email.client] : null;
+  const syncAndAnalyzeWithAI = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/gmail");
+      if (res.status === 401) {
+        onToast("Not authenticated. Please connect Gmail first.");
+        setSyncing(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.tasks) {
+        await loadTasks();
+        await fetchRawEmails(); // Refresh raw list too in case label status changed
+        onToast(`Successfully synced inbox! Extracted ${data.tasks.length} tasks.`);
+      } else if (data.error) {
+        onToast(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      onToast("AI sync failed.");
+    }
+    setSyncing(false);
+  };
+
+  const selectedEmail = emails.find((e) => e.id === selectedId);
+  const associatedTask = selectedEmail ? tasks.find(t => t.sourceMessageId === selectedEmail.id) : null;
+  const cc = associatedTask && associatedTask.client ? CLIENT_COLORS[associatedTask.client] : null;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Email Integration</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+            <Mail className="text-red-500" size={24} />
+            Email Integration
+          </h1>
           {connectedEmail ? (
             <div className="flex items-center gap-2 mt-1">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -759,135 +827,250 @@ function EmailView({
               </span>
               <button
                 onClick={disconnectGmail}
-                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2 underline cursor-pointer"
+                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2 underline cursor-pointer font-medium"
               >
                 Disconnect
               </button>
             </div>
           ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-1.5">
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-1.5 font-medium">
               <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
               Not connected
             </p>
           )}
         </div>
-        <div className="flex gap-3">
-          {!connectedEmail ? (
+        
+        {connectedEmail && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => window.location.href = "/api/auth/login"}
-              className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-sm"
+              onClick={() => fetchRawEmails()}
+              disabled={loading || syncing}
+              className="flex items-center gap-2 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 px-3.5 py-1.5 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm disabled:opacity-50 cursor-pointer"
             >
-              📧 Connect Gmail
+              <RefreshCw size={14} className={loading ? "animate-spin text-gray-400" : ""} />
+              🔄 Refresh
             </button>
-          ) : (
+
             <button
-              onClick={fetchRealEmails}
-              disabled={loading}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              onClick={syncAndAnalyzeWithAI}
+              disabled={loading || syncing}
+              className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white px-4 py-1.5 rounded-lg font-semibold shadow-md transition-all text-sm disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : "📨"}
-              {loading ? "🤖 AI Reading Emails..." : "Fetch Real Emails"}
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {syncing ? "Analyzing Inbox..." : "🤖 Sync & Analyze (AI)"}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-      <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
-        {/* Left panel */}
-        <div className="w-80 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
-          <div className="bg-red-600 dark:bg-red-800 text-white px-4 py-3 font-semibold text-sm flex items-center gap-2">
-            <Inbox size={16} /> Inbox
+
+      {!connectedEmail ? (
+        <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 dark:border-white/10 rounded-2xl p-12 text-center bg-white dark:bg-[#18181b] shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-950/20 flex items-center justify-center text-red-500 mb-4 border border-red-100 dark:border-red-900/30">
+            <Mail size={32} />
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {EMAILS.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => setSelected(e.id)}
-                className={`w-full text-left px-4 py-3 border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${selected === e.id ? "bg-blue-50 dark:bg-blue-950/20 border-l-2 border-l-blue-500" : ""}`}
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <p className={`text-xs ${e.unread ? "font-bold text-gray-900 dark:text-gray-200" : "text-gray-500 dark:text-gray-500"} truncate max-w-[150px]`}>
-                    {e.from}
-                  </p>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0">{e.time}</span>
-                </div>
-                <p className={`text-sm ${e.unread ? "font-semibold text-gray-800 dark:text-gray-200" : "text-gray-500 dark:text-gray-500"} truncate`}>
-                  {e.subject}
-                </p>
-                {e.hasTask && (
-                  <span className="mt-1 inline-flex items-center text-[10px] bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold rounded-full px-2 py-0.5">
-                    🤖 Task Found
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Connect Your Gmail Account</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6 leading-relaxed">
+            TaskPulse uses secure Google OAuth to scan your inbox, utilizing advanced Gemini AI reasoning to parse deliverables, assign tasks, and build your board instantly.
+          </p>
+          <button
+            onClick={() => window.location.href = "/api/auth/login"}
+            className="flex items-center gap-2 bg-red-650 hover:bg-red-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-md transition-all text-sm hover:scale-[1.02] cursor-pointer"
+          >
+            📧 Connect Gmail Securely
+          </button>
         </div>
-
-        {/* Right panel */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-[#18181b] overflow-y-auto">
-          {/* Gmail-style top bar */}
-          <div className="bg-red-600 dark:bg-red-800 px-6 py-3 flex-shrink-0" />
-
-          <div className="px-8 py-6 flex-1">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">{email.subject}</h2>
-            <div className="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400 mb-6 pb-6 border-b border-gray-100 dark:border-white/5">
-              <span><strong className="text-gray-700 dark:text-gray-300">From:</strong> {email.from}</span>
-              <span><strong className="text-gray-700 dark:text-gray-300">To:</strong> team@agency.com</span>
-              <span><strong className="text-gray-700 dark:text-gray-300">Date:</strong> {email.time}, May 2026</span>
+      ) : (
+        <div className="flex rounded-2xl overflow-hidden shadow-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#18181b]" style={{ height: "calc(100vh - 240px)", minHeight: 480 }}>
+          {/* Left Panel: Inbox List */}
+          <div className="w-96 flex-shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col bg-white dark:bg-[#111114]">
+            <div className="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#151518] px-4 py-3 font-bold text-sm text-gray-700 dark:text-gray-300 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Inbox size={15} className="text-indigo-500" />
+                Inbox ({emails.length} email{emails.length !== 1 ? "s" : ""})
+              </span>
             </div>
 
-            <p className="text-gray-700 dark:text-gray-350 leading-relaxed text-sm mb-8">{email.body}</p>
+            <div className="flex-1 overflow-y-auto divide-y divide-[#f1f3f4] dark:divide-white/5">
+              {loading && emails.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-500 gap-2">
+                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  <p className="text-xs">Loading emails from Gmail...</p>
+                </div>
+              ) : emails.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-500 text-center px-4">
+                  <Mail size={24} className="mb-2 text-gray-300 dark:text-gray-600" />
+                  <p className="text-xs font-semibold">Your Gmail inbox is empty</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-550 mt-1 max-w-[200px]">Or we couldn't fetch messages. Click Refresh to retry.</p>
+                </div>
+              ) : (
+                emails.map((e) => {
+                  const avatar = getAvatarStyle(e.fromName);
+                  const isSelected = selectedId === e.id;
+                  
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelectedId(e.id)}
+                      className={`w-full text-left px-4 py-3 flex gap-3 transition-colors text-xs items-start cursor-pointer border-b border-[#f1f3f4] dark:border-white/5 ${
+                        isSelected 
+                          ? "bg-[#e8f0fe] dark:bg-blue-950/30 border-l-[3px] border-l-[#1a73e8]" 
+                          : e.isUnread 
+                            ? "bg-[#f2f6fc] dark:bg-blue-950/10 hover:bg-[#f5f7fa] dark:hover:bg-white/5" 
+                            : "bg-white dark:bg-[#111114] hover:bg-[#f5f7fa] dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {/* Pastel Initial Circle */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold border text-sm shadow-sm ${avatar.bg} ${avatar.border}`}>
+                        {e.fromName ? e.fromName.charAt(0).toUpperCase() : "?"}
+                      </div>
 
-            {email.hasTask && email.task && cc && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 rounded-xl p-5"
-              >
-                <h3 className="font-bold text-blue-800 dark:text-blue-300 text-sm mb-3 flex items-center gap-2">
-                  🤖 TaskPulse Extracted Task:
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Task</p>
-                    <p className="font-semibold text-gray-800 dark:text-gray-250">{email.task.title}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Assigned To</p>
-                    <p className="font-semibold text-gray-800 dark:text-gray-250">{email.task.assignedTo}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Priority</p>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      email.task.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" :
-                      email.task.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300" :
-                      "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
-                    }`}>
-                      {email.task.priority}
+                      {/* Text details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-0.5">
+                          <p className={`text-xs truncate max-w-[170px] ${e.isUnread ? "font-bold text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"}`}>
+                            {e.fromName}
+                          </p>
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0 ml-1 font-medium">{e.date}</span>
+                        </div>
+                        
+                        <p className={`text-xs truncate mb-0.5 ${e.isUnread ? "font-bold text-gray-800 dark:text-gray-250" : "text-gray-600 dark:text-gray-400"}`}>
+                          {e.subject}
+                        </p>
+                        
+                        <p className="text-[11px] text-gray-450 dark:text-gray-500 line-clamp-2 leading-tight">
+                          {e.snippet.length > 60 ? e.snippet.substring(0, 60) + "..." : e.snippet}
+                        </p>
+
+                        <div className="flex gap-1.5 mt-1.5 items-center flex-wrap">
+                          {e.isUnread && (
+                            <span className="text-[9px] bg-[#1a73e8] text-white font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm">
+                              UNREAD
+                            </span>
+                          )}
+                          {associatedTask && (
+                            <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-350 font-bold px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/30 flex items-center gap-0.5 shadow-sm">
+                              <Sparkles size={8} /> Synced Task
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Right Panel: Reader */}
+          <div className="flex-1 flex flex-col bg-white dark:bg-[#18181b] overflow-y-auto">
+            {/* Top red header bar to maintain color scheme */}
+            <div className="bg-red-650 dark:bg-red-800 px-6 py-3.5 flex-shrink-0 text-white font-semibold text-xs flex justify-between items-center shadow-sm">
+              <span>Gmail Content Viewer</span>
+              {selectedEmail && (
+                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                  ID: {selectedEmail.id}
+                </span>
+              )}
+            </div>
+
+            {selectedEmail ? (
+              <div className="px-8 py-6 flex-1 flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 leading-snug">
+                  {selectedEmail.subject}
+                </h2>
+                
+                <div className="flex flex-col md:flex-row md:justify-between gap-2 text-xs text-gray-500 dark:text-gray-400 mb-6 pb-6 border-b border-gray-150 dark:border-white/5">
+                  <div className="flex flex-col gap-1">
+                    <span>
+                      <strong className="text-gray-700 dark:text-gray-300">From:</strong> {selectedEmail.fromName}{" "}
+                      <span className="text-gray-400 dark:text-gray-500">&lt;{selectedEmail.fromEmail}&gt;</span>
+                    </span>
+                    <span>
+                      <strong className="text-gray-700 dark:text-gray-300">To:</strong> me (via OAuth API)
                     </span>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">Deadline</p>
-                    <p className="font-semibold text-gray-800 dark:text-gray-250">{formatDate(email.task.deadline)}</p>
+                  <div className="md:text-right">
+                    <span>
+                      <strong className="text-gray-700 dark:text-gray-300">Date:</strong> {selectedEmail.date}
+                    </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => onToast("Task added to dashboard!")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
-                >
-                  ✅ Add to Dashboard
-                </button>
-              </motion.div>
-            )}
 
-            {!email.hasTask && (
-              <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-5 text-center text-gray-400 dark:text-gray-500 text-sm">
-                No tasks extracted from this email.
+                <div className="text-gray-700 dark:text-gray-300 leading-relaxed text-sm mb-8 max-w-3xl whitespace-pre-wrap font-sans bg-gray-50/30 dark:bg-white/[0.02] p-6 rounded-xl border border-gray-150 dark:border-white/5 flex-1">
+                  {selectedEmail.snippet}
+                </div>
+
+                {/* Extracted Task Display */}
+                {associatedTask && cc ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/30 rounded-xl p-5"
+                  >
+                    <h3 className="font-bold text-emerald-800 dark:text-emerald-300 text-sm mb-3 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-emerald-500 animate-pulse" />
+                      🤖 TaskPulse Extracted Task:
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-4">
+                      <div>
+                        <p className="text-gray-450 dark:text-gray-500 font-medium mb-0.5">Task Title</p>
+                        <p className="font-bold text-gray-800 dark:text-gray-200 line-clamp-1">{associatedTask.title}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-450 dark:text-gray-500 font-medium mb-0.5">Assigned To</p>
+                        <p className="font-semibold text-gray-850 dark:text-gray-250 flex items-center gap-1">
+                          <User size={12} className="text-indigo-400" /> {associatedTask.assignedTo}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-450 dark:text-gray-500 font-medium mb-0.5">Priority</p>
+                        <span className={`inline-block font-bold text-[10px] px-2 py-0.5 rounded-full ${
+                          associatedTask.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" :
+                          associatedTask.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300" :
+                          "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                        }`}>
+                          {associatedTask.priority}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-gray-450 dark:text-gray-500 font-medium mb-0.5">Deadline</p>
+                        <p className="font-semibold text-gray-850 dark:text-gray-250 flex items-center gap-1">
+                          <Calendar size={12} className="text-indigo-400" /> {formatDate(associatedTask.deadline)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("dashboard")}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <CheckCircle2 size={12} />
+                      View on Dashboard
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-5 text-center text-gray-400 dark:text-gray-500 text-xs flex flex-col items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-500 animate-pulse" />
+                    <span>No task extracted from this email yet.</span>
+                    <button
+                      onClick={syncAndAnalyzeWithAI}
+                      disabled={syncing || loading}
+                      className="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      🤖 Scan Inbox with AI
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                <Mail size={36} className="mb-2 text-gray-350 dark:text-gray-600" />
+                <p className="text-sm font-semibold">No Email Selected</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-medium">Select an email from the inbox list to read it.</p>
               </div>
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1921,6 +2104,7 @@ export default function TaskPulse() {
                 onToast={addToast} 
                 loadTasks={loadTasks} 
                 setActiveTab={setActiveTab} 
+                tasks={tasks}
               />
             )}
           </motion.div>

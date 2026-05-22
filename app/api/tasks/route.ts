@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
       status: t.status === "done" ? "done" : "pending",
       confidence: t.status === "unconfirmed" ? 80 : (t.status === "confirmed" ? 95 : (t.confidence || 100)),
       sourceMessage: t.source_message_text || "",
+      sourceMessageId: t.source_message_id || null,
     }));
 
     return NextResponse.json(mapped);
