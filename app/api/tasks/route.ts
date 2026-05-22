@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, status, assignee, isBlocked, blockerNote } = body;
+    const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const updateFields: any = {};
@@ -72,6 +72,18 @@ export async function PUT(req: NextRequest) {
     }
     if (assignee !== undefined) {
       updateFields.assignee = assignee;
+    }
+    if (title !== undefined) {
+      updateFields.title = title;
+    }
+    if (priority !== undefined) {
+      updateFields.priority = priority;
+    }
+    if (deadline !== undefined) {
+      updateFields.deadline = deadline;
+    }
+    if (client !== undefined) {
+      updateFields.source_group_name = `${client} Campaign`;
     }
     if (isBlocked !== undefined || blockerNote !== undefined) {
       const sourceQuoteJSON = JSON.stringify({

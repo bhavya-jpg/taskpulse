@@ -35,6 +35,7 @@ import {
   RefreshCw,
   LogOut,
   Undo,
+  Edit2,
 } from "lucide-react";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { WhatsAppConnector, GroupSelector, useTaskStream, WAStatusBadge } from "@/components/whatsapp-setup";
@@ -183,6 +184,7 @@ function TaskCard({
   onReassign,
   onToggleBlocker,
   onSendToReview,
+  onUpdateTask,
   showConfirmButtons = false,
   showFrom = false,
   isFounder = false,
@@ -194,6 +196,7 @@ function TaskCard({
   onReassign?: (id: number | string, newAssignee: string) => void;
   onToggleBlocker?: (id: number | string, isBlocked: boolean, note?: string) => void;
   onSendToReview?: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
   showConfirmButtons?: boolean;
   showFrom?: boolean;
   isFounder?: boolean;
@@ -204,6 +207,142 @@ function TaskCard({
   const pc = PRIORITY_CONFIG[task.priority];
   const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100 dark:bg-gray-900/40", text: "text-gray-700 dark:text-gray-300", border: "border-gray-300 dark:border-white/10" };
   const overdue = isOverdue(task.deadline) && task.status !== "done";
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editClient, setEditClient] = useState(task.client);
+  const [editPriority, setEditPriority] = useState<Priority>(task.priority);
+  const [editAssignee, setEditAssignee] = useState(task.assignedTo);
+  const [editDeadline, setEditDeadline] = useState(task.deadline);
+
+  useEffect(() => {
+    setEditTitle(task.title);
+    setEditClient(task.client);
+    setEditPriority(task.priority);
+    setEditAssignee(task.assignedTo);
+    setEditDeadline(task.deadline);
+  }, [task]);
+
+  if (isEditing) {
+    return (
+      <motion.div
+        layout
+        className="bg-white dark:bg-[#121214] rounded-xl shadow-md border border-indigo-500/30 p-4 flex flex-col gap-3.5"
+      >
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 pb-2">
+          <span className="text-xs font-extrabold text-indigo-650 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5 animate-none">
+            <Edit2 size={12} className="text-indigo-500" /> Edit Deliverable
+          </span>
+          <button
+            onClick={() => setIsEditing(false)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-md cursor-pointer border-none bg-transparent flex items-center justify-center outline-none animate-none"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Title input */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Task Title</label>
+          <input
+            type="text"
+            required
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        {/* Client & Priority side by side */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Client</label>
+            <select
+              value={editClient}
+              onChange={(e) => setEditClient(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-bold outline-none cursor-pointer"
+            >
+              {CLIENTS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Priority</label>
+            <select
+              value={editPriority}
+              onChange={(e) => setEditPriority(e.target.value as Priority)}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-bold outline-none cursor-pointer"
+            >
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Assignee & Deadline side by side */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Assignee</label>
+            <select
+              value={editAssignee}
+              onChange={(e) => setEditAssignee(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-bold outline-none cursor-pointer"
+            >
+              {EMPLOYEES.map((emp) => (
+                <option key={emp} value={emp}>{emp}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Deadline</label>
+            <input
+              type="date"
+              required
+              value={editDeadline}
+              onChange={(e) => setEditDeadline(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-semibold outline-none cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* Form buttons */}
+        <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-white/5 mt-1.5">
+          <button
+            onClick={async () => {
+              if (editTitle.trim()) {
+                await onUpdateTask?.(task.id, {
+                  title: editTitle.trim(),
+                  client: editClient,
+                  priority: editPriority,
+                  assignedTo: editAssignee,
+                  deadline: editDeadline,
+                });
+                setIsEditing(false);
+              }
+            }}
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+          >
+            <CheckCircle2 size={13} /> Save
+          </button>
+          <button
+            onClick={() => {
+              setEditTitle(task.title);
+              setEditClient(task.client);
+              setEditPriority(task.priority);
+              setEditAssignee(task.assignedTo);
+              setEditDeadline(task.deadline);
+              setIsEditing(false);
+            }}
+            className="flex-1 bg-white dark:bg-[#1a1a1f] hover:bg-gray-100 dark:hover:bg-white/5 text-gray-650 dark:text-gray-300 text-[11px] font-bold rounded-lg py-2 transition-all border border-gray-200/80 dark:border-white/5 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+          >
+            <X size={13} /> Cancel
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -226,38 +365,50 @@ function TaskCard({
             </span>
           </div>
           
-          {/* Custom Source platform badges */}
-          {task.source === "slack" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-purple-50/50 dark:bg-purple-950/15 border-purple-200/50 dark:border-purple-900/35 text-purple-700 dark:text-purple-400 shadow-sm">
-              <MessageCircle size={10} className="rotate-90 text-purple-500" />
-              Slack
-            </span>
-          ) : task.source === "email" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
-              <Mail size={10} className="text-blue-500" />
-              Gmail
-            </span>
-          ) : task.source === "fathom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-violet-50/50 dark:bg-violet-950/15 border-violet-200/50 dark:border-violet-900/35 text-violet-700 dark:text-violet-400 shadow-sm">
-              <Video size={10} className="text-violet-500" />
-              Fathom
-            </span>
-          ) : task.source === "zoom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
-              <Video size={10} className="text-blue-500" />
-              Zoom
-            </span>
-          ) : task.source === "google_meet" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
-              <Video size={10} className="text-emerald-500" />
-              Google Meet
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
-              <MessageCircle size={10} className="text-emerald-500" />
-              WhatsApp
-            </span>
-          )}
+          {/* Custom Source platform badges & Edit Button */}
+          <div className="flex items-center gap-1.5">
+            {task.source === "slack" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-purple-50/50 dark:bg-purple-950/15 border-purple-200/50 dark:border-purple-900/35 text-purple-700 dark:text-purple-400 shadow-sm">
+                <MessageCircle size={10} className="rotate-90 text-purple-500" />
+                Slack
+              </span>
+            ) : task.source === "email" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
+                <Mail size={10} className="text-blue-500" />
+                Gmail
+              </span>
+            ) : task.source === "fathom" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-violet-50/50 dark:bg-violet-950/15 border-violet-200/50 dark:border-violet-900/35 text-violet-700 dark:text-violet-400 shadow-sm">
+                <Video size={10} className="text-violet-500" />
+                Fathom
+              </span>
+            ) : task.source === "zoom" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
+                <Video size={10} className="text-blue-500" />
+                Zoom
+              </span>
+            ) : task.source === "google_meet" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                <Video size={10} className="text-emerald-500" />
+                Google Meet
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                <MessageCircle size={10} className="text-emerald-500" />
+                WhatsApp
+              </span>
+            )}
+
+            {isFounder && onUpdateTask && (
+              <button
+                onClick={() => setIsEditing(true)}
+                title="Edit Deliverable"
+                className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-md transition-colors cursor-pointer border-none bg-transparent flex items-center justify-center outline-none animate-none"
+              >
+                <Edit2 size={11} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -520,7 +671,7 @@ function ManualTaskCreator({
         </div>
         <button
           onClick={() => setIsOpen((prev) => !prev)}
-          className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-755 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer border-none flex items-center gap-1 animate-none outline-none"
+          className="px-3 py-1.5 bg-indigo-50/80 dark:bg-indigo-950/40 hover:bg-indigo-100/90 dark:hover:bg-indigo-950/60 text-indigo-900 dark:text-indigo-300 text-xs font-bold rounded-xl shadow-sm border border-indigo-100/80 dark:border-indigo-900/30 transition-all cursor-pointer flex items-center gap-1 animate-none outline-none"
         >
           {isOpen ? "Close Creator" : "Create New Task"}
         </button>
@@ -634,6 +785,7 @@ function DashboardView({
   onAddTask,
   resolveBlocker,
   onSendToReview,
+  onUpdateTask,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
@@ -649,6 +801,7 @@ function DashboardView({
   }) => Promise<void>;
   resolveBlocker: (id: number | string) => Promise<void>;
   onSendToReview: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
 
@@ -790,7 +943,7 @@ function DashboardView({
                 <EmptyState message="All suggestions reviewed! 🎉" />
               ) : (
                 unconfirmed.map((t) => (
-                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} />
+                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} />
                 ))
               )}
             </AnimatePresence>
@@ -823,6 +976,7 @@ function DashboardView({
                     isFounder={true}
                     onReassign={onReassign}
                     onSendToReview={onSendToReview}
+                    onUpdateTask={onUpdateTask}
                   />
                 ))
               )}
@@ -849,7 +1003,7 @@ function DashboardView({
                 <EmptyState message="No tasks done yet." />
               ) : (
                 done.map((t) => (
-                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} />
+                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} />
                 ))
               )}
             </AnimatePresence>
@@ -862,7 +1016,15 @@ function DashboardView({
 
 // ─── VIEW: BY CLIENT ──────────────────────────────────────────────────────────
 
-function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: number) => void }) {
+function ClientView({
+  tasks,
+  onMarkDone,
+  onUpdateTask,
+}: {
+  tasks: Task[];
+  onMarkDone: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+}) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const total = tasks.length;
@@ -935,7 +1097,7 @@ function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: num
                             <EmptyState message="No tasks for this client" />
                           ) : (
                             clientTasks.map((t) => (
-                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} />
+                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} />
                             ))
                           )}
                         </AnimatePresence>
@@ -954,7 +1116,15 @@ function ClientView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: num
 
 // ─── VIEW: BY EMPLOYEE ────────────────────────────────────────────────────────
 
-function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: number) => void }) {
+function EmployeeView({
+  tasks,
+  onMarkDone,
+  onUpdateTask,
+}: {
+  tasks: Task[];
+  onMarkDone: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+}) {
   const [selected, setSelected] = useState("Rahul");
 
   const empTasks = tasks.filter((t) => t.assignedTo === selected);
@@ -1005,7 +1175,7 @@ function EmployeeView({ tasks, onMarkDone }: { tasks: Task[]; onMarkDone: (id: n
             <EmptyState message="No tasks assigned to this employee 🎉" />
           ) : (
             empTasks.map((t) => (
-              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom />
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom isFounder={true} onUpdateTask={onUpdateTask} />
             ))
           )}
         </AnimatePresence>
@@ -2384,6 +2554,34 @@ export default function TaskPulse() {
     }
   };
 
+  const updateTask = async (id: number | string, updatedFields: Partial<Task>) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t))
+    );
+    addToast("Task updated successfully!");
+
+    if (typeof id === "string") {
+      try {
+        const body: any = { id };
+        if (updatedFields.title !== undefined) body.title = updatedFields.title;
+        if (updatedFields.priority !== undefined) body.priority = updatedFields.priority;
+        if (updatedFields.deadline !== undefined) body.deadline = updatedFields.deadline;
+        if (updatedFields.client !== undefined) body.client = updatedFields.client;
+        if (updatedFields.assignedTo !== undefined) body.assignee = updatedFields.assignedTo;
+        if (updatedFields.isBlocked !== undefined) body.isBlocked = updatedFields.isBlocked;
+        if (updatedFields.blockerNote !== undefined) body.blockerNote = updatedFields.blockerNote;
+
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        console.error("Failed to update task on backend:", err);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
@@ -2510,14 +2708,15 @@ export default function TaskPulse() {
                 onAddTask={addTask}
                 resolveBlocker={resolveBlocker}
                 onSendToReview={sendTaskToReview}
+                onUpdateTask={updateTask}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
             {activeTab === "client" && (
-              <ClientView tasks={tasks} onMarkDone={markDone} />
+              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} />
             )}
             {activeTab === "employee" && (
-              <EmployeeView tasks={tasks} onMarkDone={markDone} />
+              <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} />
             )}
             {activeTab === "slack" && (
               <SlackSetup 
