@@ -46,8 +46,8 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !channelId) {
-      onToast("Token and Channel ID are required.");
+    if (!token || !channelId || !channelName) {
+      onToast("Token, Channel ID, and Display Channel Name are required.");
       return;
     }
 
@@ -186,7 +186,7 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
                 </div>
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                    Display Channel Name (Optional)
+                    Display Channel Name (Required)
                   </label>
                   <input
                     type="text"
@@ -194,6 +194,7 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
                     onChange={(e) => setChannelName(e.target.value)}
                     placeholder="client-feed"
                     className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-3 text-sm text-gray-850 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                    required
                   />
                 </div>
               </div>
