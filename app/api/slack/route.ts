@@ -133,6 +133,14 @@ export async function GET() {
   }
   const userId = session.user.id;
 
+  // Fetch current user's profile to resolve company
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("company")
+    .eq("id", userId)
+    .single();
+  const company = profile?.company || null;
+
   const cookieStore = await cookies();
   const token = cookieStore.get("slack_token")?.value;
   const channelId = cookieStore.get("slack_channel")?.value;
@@ -245,6 +253,7 @@ Respond ONLY with the requested JSON array representing tasks found.`;
                 .from("tasks")
                 .insert({
                   user_id: userId,
+                  company,
                   title: task.task_title,
                   priority: task.priority || "Medium",
                   deadline: task.deadline || null,
@@ -252,7 +261,7 @@ Respond ONLY with the requested JSON array representing tasks found.`;
                   confidence: task.confidence || 80,
                   status: task.confidence >= 85 ? "confirmed" : "unconfirmed",
                   source_platform: "slack",
-                  source_group_name: `#${channelName}`,
+                  source_group_name: `${matchedClient} - #${channelName}`,
                   source_sender_name: originalMsg.sender,
                   source_message_text: originalMsg.text,
                   source_message_id: originalMsg.id, // UNIQUE key preventing duplicates

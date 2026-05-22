@@ -188,6 +188,7 @@ function TaskCard({
   showConfirmButtons = false,
   showFrom = false,
   isFounder = false,
+  employees,
 }: {
   task: Task;
   onMarkDone?: (id: number | string) => void;
@@ -200,6 +201,7 @@ function TaskCard({
   showConfirmButtons?: boolean;
   showFrom?: boolean;
   isFounder?: boolean;
+  employees?: string[];
 }) {
   const [showSource, setShowSource] = useState(false);
   const [showBlockerModal, setShowBlockerModal] = useState(false);
@@ -290,7 +292,7 @@ function TaskCard({
               onChange={(e) => setEditAssignee(e.target.value)}
               className="w-full bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 font-bold outline-none cursor-pointer"
             >
-              {EMPLOYEES.map((emp) => (
+              {(employees || EMPLOYEES).map((emp) => (
                 <option key={emp} value={emp}>{emp}</option>
               ))}
             </select>
@@ -441,7 +443,7 @@ function TaskCard({
                 onChange={(e) => onReassign?.(task.id, e.target.value)}
                 className="bg-indigo-50/80 dark:bg-[#1a1a1f] border border-indigo-200/50 dark:border-white/10 rounded-lg px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-indigo-500 font-bold cursor-pointer transition-colors"
               >
-                {EMPLOYEES.map((emp) => (
+                {(employees || EMPLOYEES).map((emp) => (
                   <option key={emp} value={emp}>{emp}</option>
                 ))}
               </select>
@@ -630,6 +632,7 @@ function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: 
 
 function ManualTaskCreator({
   onAddTask,
+  employees,
 }: {
   onAddTask: (task: {
     title: string;
@@ -638,14 +641,21 @@ function ManualTaskCreator({
     deadline: string;
     priority: Priority;
   }) => Promise<void>;
+  employees?: string[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [client, setClient] = useState(CLIENTS[0]);
-  const [assignedTo, setAssignedTo] = useState(EMPLOYEES[0]);
+  const [assignedTo, setAssignedTo] = useState((employees && employees.length > 0) ? employees[0] : EMPLOYEES[0]);
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (employees && employees.length > 0) {
+      setAssignedTo(employees[0]);
+    }
+  }, [employees]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -719,7 +729,7 @@ function ManualTaskCreator({
                   onChange={(e) => setAssignedTo(e.target.value)}
                   className="bg-gray-50 dark:bg-[#1a1a1f] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 outline-none cursor-pointer font-bold"
                 >
-                  {EMPLOYEES.map((e) => (
+                  {(employees || EMPLOYEES).map((e) => (
                     <option key={e} value={e}>{e}</option>
                   ))}
                 </select>
@@ -786,6 +796,7 @@ function DashboardView({
   resolveBlocker,
   onSendToReview,
   onUpdateTask,
+  employees,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
@@ -802,6 +813,7 @@ function DashboardView({
   resolveBlocker: (id: number | string) => Promise<void>;
   onSendToReview: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  employees?: string[];
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
 
@@ -893,7 +905,7 @@ function DashboardView({
       )}
 
       {/* Manual Task Creator */}
-      <ManualTaskCreator onAddTask={onAddTask} />
+      <ManualTaskCreator onAddTask={onAddTask} employees={employees} />
 
       {/* Segmented Filter Control */}
       <div className="flex justify-between items-center bg-white dark:bg-[#121214] p-3 rounded-2xl border border-gray-200/60 dark:border-white/5 shadow-sm">
@@ -943,7 +955,7 @@ function DashboardView({
                 <EmptyState message="All suggestions reviewed! 🎉" />
               ) : (
                 unconfirmed.map((t) => (
-                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} />
+                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} employees={employees} />
                 ))
               )}
             </AnimatePresence>
@@ -977,6 +989,7 @@ function DashboardView({
                     onReassign={onReassign}
                     onSendToReview={onSendToReview}
                     onUpdateTask={onUpdateTask}
+                    employees={employees}
                   />
                 ))
               )}
@@ -1003,7 +1016,7 @@ function DashboardView({
                 <EmptyState message="No tasks done yet." />
               ) : (
                 done.map((t) => (
-                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} />
+                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} employees={employees} />
                 ))
               )}
             </AnimatePresence>
@@ -1020,10 +1033,12 @@ function ClientView({
   tasks,
   onMarkDone,
   onUpdateTask,
+  employees,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  employees?: string[];
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -1097,7 +1112,7 @@ function ClientView({
                             <EmptyState message="No tasks for this client" />
                           ) : (
                             clientTasks.map((t) => (
-                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} />
+                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} employees={employees} />
                             ))
                           )}
                         </AnimatePresence>
@@ -1120,10 +1135,12 @@ function EmployeeView({
   tasks,
   onMarkDone,
   onUpdateTask,
+  employees,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  employees?: string[];
 }) {
   const [selected, setSelected] = useState("Rahul");
 
@@ -1141,7 +1158,7 @@ function EmployeeView({
           onChange={(e) => setSelected(e.target.value)}
           className="border border-gray-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-[#18181b] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          {EMPLOYEES.map((e) => (
+          {(employees || EMPLOYEES).map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>
@@ -1175,7 +1192,7 @@ function EmployeeView({
             <EmptyState message="No tasks assigned to this employee 🎉" />
           ) : (
             empTasks.map((t) => (
-              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom isFounder={true} onUpdateTask={onUpdateTask} />
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom isFounder={true} onUpdateTask={onUpdateTask} employees={employees} />
             ))
           )}
         </AnimatePresence>
@@ -2251,52 +2268,23 @@ function EmployeeDashboard({
               ].map((item, idx) => (
                 <div 
                   key={idx}
-                  className="flex items-center gap-2 bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs font-semibold text-gray-400"
                 >
-                  <span className="text-indigo-500 dark:text-indigo-400">{item.icon}</span>
+                  {item.icon}
                   {item.name}
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Secondary Action */}
-          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-3">
-            <button
-              onClick={onResetOnboarding}
-              className="bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-800 dark:text-white text-xs font-bold py-3 px-5 rounded-xl border border-gray-200/30 dark:border-white/5 active:scale-[0.98] transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
-            >
-              <RefreshCw size={12} /> Switch Designation
-            </button>
-            <button
-              onClick={onSignOut}
-              className="bg-transparent hover:bg-red-500/5 text-red-500 hover:text-red-600 text-xs font-bold py-3 px-5 rounded-xl border border-red-500/20 active:scale-[0.98] transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
-            >
-              <LogOut size={12} /> Sign Out
-            </button>
-          </div>
-
         </motion.div>
       </main>
 
-      {/* FOOTER */}
-      <footer className="w-full py-6 border-t border-gray-100 dark:border-white/5 text-center text-xs text-gray-400 bg-white/10 dark:bg-transparent z-10">
-        <p>© 2026 TaskPulse. Sandboxed Employee Client Session.</p>
+      <footer className="w-full text-center py-6 text-[10px] text-gray-500 border-t border-white/5 bg-black/20 z-10 flex-shrink-0">
+        TaskPulse © 2026. Custom corporate task automation sandbox.
       </footer>
     </div>
   );
 }
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Dashboard",     icon: <BarChart2 size={15} /> },
-  { id: "meetings",  label: "Meetings",      icon: <Video size={15} /> },
-  { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
-  { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
-  { id: "slack",     label: "Slack Connect", icon: <Hash size={15} /> },
-  { id: "email",     label: "Email",    icon: <Mail size={15} /> },
-];
 
 export default function TaskPulse() {
   const { data: session, status } = useSession();
@@ -2304,6 +2292,7 @@ export default function TaskPulse() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [dbEmployees, setDbEmployees] = useState<any[]>([]);
 
   // Onboarding States
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -2339,24 +2328,96 @@ export default function TaskPulse() {
     }
   };
 
-  useEffect(() => {
-    setMounted(true);
-    loadTasks();
-
-    // Check onboarding status
-    const data = localStorage.getItem("taskpulse_onboarding");
-    if (data) {
-      try {
-        const parsed = JSON.parse(data);
-        setOnboardingData(parsed);
-        setOnboarded(true);
-      } catch {
-        setOnboarded(false);
+  const loadEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees");
+      if (res.status === 200) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setDbEmployees(data);
+        }
       }
-    } else {
+    } catch (err) {
+      console.error("Failed to load dynamic employees:", err);
+    }
+  };
+
+  const dynamicEmployees = Array.from(
+    new Set([...dbEmployees.map((e) => e.name), ...EMPLOYEES])
+  );
+
+  const checkOnboarding = async () => {
+    if (status !== "authenticated" || !session) return;
+    try {
+      const res = await fetch("/api/profile");
+      if (res.status === 200) {
+        const data = await res.json();
+        if (data && data.profile) {
+          setOnboardingData(data.profile);
+          localStorage.setItem("taskpulse_onboarding", JSON.stringify(data.profile));
+          setOnboarded(true);
+          return;
+        }
+      }
+
+      // Fallback: Check local storage for legacy/local state
+      const localData = localStorage.getItem("taskpulse_onboarding");
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          if (parsed && parsed.name && parsed.company && parsed.designation) {
+            // POST legacy state to the DB to sync it
+            const postRes = await fetch("/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: parsed.name,
+                email: session.user?.email || "",
+                company: parsed.company,
+                designation: parsed.designation,
+              }),
+            });
+            if (postRes.status === 200) {
+              const postData = await postRes.json();
+              if (postData && postData.profile) {
+                setOnboardingData(postData.profile);
+                localStorage.setItem("taskpulse_onboarding", JSON.stringify(postData.profile));
+                setOnboarded(true);
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse/sync legacy onboarding data:", e);
+        }
+      }
+
+      // No profile found anywhere
+      setOnboarded(false);
+    } catch (err) {
+      console.error("Failed to check onboarding:", err);
       setOnboarded(false);
     }
+  };
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (status === "authenticated" && session) {
+      checkOnboarding();
+    } else if (status === "unauthenticated") {
+      setOnboarded(false);
+    }
+  }, [status, session]);
+
+  useEffect(() => {
+    if (onboarded === true) {
+      loadTasks();
+      loadEmployees();
+    }
+  }, [onboarded]);
   
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [demoMode, setDemoMode] = useState(false);
@@ -2376,7 +2437,7 @@ export default function TaskPulse() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-xs text-gray-500 font-semibold animate-pulse">Loading session...</p>
+          <p className="text-xs text-gray-550 font-semibold animate-pulse">Loading session...</p>
         </div>
       </div>
     );
@@ -2390,11 +2451,33 @@ export default function TaskPulse() {
     return (
       <OnboardingPage
         session={session}
-        onComplete={(data) => {
-          localStorage.setItem("taskpulse_onboarding", JSON.stringify(data));
-          setOnboardingData(data);
-          setOnboarded(true);
-          addToast("Onboarding completed successfully!");
+        onComplete={async (data) => {
+          try {
+            const res = await fetch("/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: data.name,
+                email: session?.user?.email || "",
+                company: data.company,
+                designation: data.designation,
+              }),
+            });
+            if (res.status === 200) {
+              const body = await res.json();
+              if (body && body.profile) {
+                localStorage.setItem("taskpulse_onboarding", JSON.stringify(body.profile));
+                setOnboardingData(body.profile);
+                setOnboarded(true);
+                addToast("Onboarding completed successfully!");
+                return;
+              }
+            }
+            throw new Error("Failed to save profile to database");
+          } catch (err) {
+            console.error("Onboarding failed:", err);
+            addToast("Failed to complete onboarding on server. Try again.");
+          }
         }}
         onSignOut={() => signOut()}
       />
@@ -2414,7 +2497,12 @@ export default function TaskPulse() {
             Please wait while we route your authenticated session to the dedicated `/employee` workspace...
           </p>
           <button
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await fetch("/api/profile", { method: "DELETE" });
+              } catch (e) {
+                console.error("Failed to delete database profile:", e);
+              }
               localStorage.removeItem("taskpulse_onboarding");
               setOnboarded(false);
               setOnboardingData(null);
@@ -2709,14 +2797,15 @@ export default function TaskPulse() {
                 resolveBlocker={resolveBlocker}
                 onSendToReview={sendTaskToReview}
                 onUpdateTask={updateTask}
+                employees={dynamicEmployees}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
             {activeTab === "client" && (
-              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} />
+              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} employees={dynamicEmployees} />
             )}
             {activeTab === "employee" && (
-              <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} />
+              <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} employees={dynamicEmployees} />
             )}
             {activeTab === "slack" && (
               <SlackSetup 

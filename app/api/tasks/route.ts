@@ -7,13 +7,28 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const userId = (session.user as any).id;
+
   try {
-    const { data: dbTasks, error } = await supabaseAdmin
+    // 1. Fetch current user's profile to resolve company
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("company")
+      .eq("id", userId)
+      .single();
+
+    let query = supabaseAdmin
       .from("tasks")
       .select("*")
-      .eq("user_id", (session.user as any).id)
-      .neq("status", "dismissed")
-      .order("created_at", { ascending: false });
+      .neq("status", "dismissed");
+
+    if (profile?.company) {
+      query = query.eq("company", profile.company);
+    } else {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data: dbTasks, error } = await query.order("created_at", { ascending: false });
 
     if (error) throw error;
 
@@ -60,6 +75,8 @@ export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const userId = (session.user as any).id;
+
   try {
     const body = await req.json();
     const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client } = body;
@@ -93,11 +110,25 @@ export async function PUT(req: NextRequest) {
       updateFields.source_quote = sourceQuoteJSON;
     }
 
-    const { error } = await supabaseAdmin
+    // 1. Fetch current user's profile to resolve company
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("company")
+      .eq("id", userId)
+      .single();
+
+    let updateQuery = supabaseAdmin
       .from("tasks")
       .update(updateFields)
-      .eq("id", id)
-      .eq("user_id", (session.user as any).id);
+      .eq("id", id);
+
+    if (profile?.company) {
+      updateQuery = updateQuery.eq("company", profile.company);
+    } else {
+      updateQuery = updateQuery.eq("user_id", userId);
+    }
+
+    const { error } = await updateQuery;
 
     if (error) throw error;
 
@@ -111,24 +142,39 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const userId = (session.user as any).id;
+
   try {
     const { title, client, assignedTo, priority, deadline } = await req.json();
     if (!title || !client) return NextResponse.json({ error: "title and client are required" }, { status: 400 });
 
+    // 1. Fetch current user's profile to resolve company
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("company")
+      .eq("id", userId)
+      .single();
+
+    const insertData: any = {
+      user_id: userId,
+      title,
+      assignee: assignedTo || "Unassigned",
+      priority: priority || "Medium",
+      deadline: deadline || new Date().toISOString().split("T")[0],
+      status: "confirmed",
+      confidence: 100,
+      source_platform: "whatsapp",
+      source_group_name: `${client} Campaign`,
+      source_message_text: `Manually created task for ${client}`,
+    };
+
+    if (profile?.company) {
+      insertData.company = profile.company;
+    }
+
     const { data, error } = await supabaseAdmin
       .from("tasks")
-      .insert({
-        user_id: (session.user as any).id,
-        title,
-        assignee: assignedTo || "Unassigned",
-        priority: priority || "Medium",
-        deadline: deadline || new Date().toISOString().split("T")[0],
-        status: "confirmed",
-        confidence: 100,
-        source_platform: "whatsapp",
-        source_group_name: `${client} Campaign`,
-        source_message_text: `Manually created task for ${client}`,
-      })
+      .insert(insertData)
       .select();
 
     if (error) throw error;
@@ -138,4 +184,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }
-

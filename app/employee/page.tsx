@@ -608,6 +608,12 @@ export default function EmployeeDashboard() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [profile, setProfile] = useState<{
+    name: string;
+    company: string;
+    designation: "founder" | "employee";
+  } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
@@ -634,12 +640,46 @@ export default function EmployeeDashboard() {
     }
   };
 
+  const loadProfileAndTasks = async () => {
+    setLoadingProfile(true);
+    try {
+      const pRes = await fetch("/api/profile");
+      if (pRes.status === 200) {
+        const pData = await pRes.json();
+        if (pData && pData.profile) {
+          if (pData.profile.designation === "founder") {
+            router.push("/");
+            return;
+          }
+          setProfile(pData.profile);
+        } else {
+          router.push("/");
+          return;
+        }
+      } else {
+        router.push("/");
+        return;
+      }
+      await loadTasks();
+    } catch (err) {
+      console.error("Failed to load profile/tasks in employee console:", err);
+      router.push("/");
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
-    loadTasks();
-  }, []);
+    if (status === "authenticated" && session) {
+      loadProfileAndTasks();
+    } else if (status === "unauthenticated") {
+      router.push("/");
+    }
+  }, [status, session]);
 
   const getEmployeeName = () => {
+    if (profile?.name) return profile.name;
     if (!session?.user?.name) return "Rahul";
     const nameLower = session.user.name.toLowerCase();
     for (const emp of EMPLOYEES) {
@@ -685,13 +725,18 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const clearDesignation = () => {
+  const clearDesignation = async () => {
+    try {
+      await fetch("/api/profile", { method: "DELETE" });
+    } catch (e) {
+      console.error("Failed to delete database profile:", e);
+    }
     localStorage.removeItem("taskpulse_onboarding");
     addToast("Designation cleared!");
     router.push("/");
   };
 
-  if (status === "loading" || loadingTasks) {
+  if (status === "loading" || loadingTasks || loadingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
         <div className="flex flex-col items-center gap-3">

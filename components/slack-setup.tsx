@@ -32,6 +32,32 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
   const [connecting, setConnecting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [connectedChannel, setConnectedChannel] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
+  const fetchSlackMessages = async () => {
+    setLoadingMessages(true);
+    try {
+      const res = await fetch("/api/slack/messages");
+      const data = await res.json();
+      if (data.messages) {
+        setMessages(data.messages);
+      }
+    } catch (err) {
+      console.error("Failed to fetch Slack messages:", err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const hasTaskKeywords = (text: string) => {
+    const keywords = [
+      "karo", "kam kar", "de dena", "bana do", "ppt", "deck", "creative", 
+      "urgent", "tomorrow", "today", "banner", "creatives", "deliver", "by", 
+      "before", "flipkart", "zomato", "amazon", "google", "task", "deliverable"
+    ];
+    return keywords.some(kw => text.toLowerCase().includes(kw));
+  };
 
   // Check connection status from cookie
   useEffect(() => {
@@ -43,6 +69,14 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
       if (name) setConnectedChannel(name);
     }
   }, []);
+
+  useEffect(() => {
+    if (connectedChannel) {
+      fetchSlackMessages();
+    } else {
+      setMessages([]);
+    }
+  }, [connectedChannel]);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +135,7 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
         onToast(`Scan Error: ${data.error}`);
       } else if (data.tasks) {
         await loadTasks();
+        await fetchSlackMessages();
         onToast(`AI processed Slack successfully! Scanned channel and synced active tasks.`);
         if (setActiveTab) {
           setActiveTab("dashboard");
@@ -332,104 +367,70 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
                 </div>
               </div>
             </div>
-
             {/* Message Pane */}
             <div className="flex-1 overflow-y-auto p-5 bg-gray-50 dark:bg-[#0c0c0e] space-y-4">
               <div className="text-center py-2">
-                <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 bg-gray-200/50 dark:bg-white/5 rounded px-2 py-1">
+                <span className="text-[10px] font-bold text-gray-455 dark:text-gray-500 bg-gray-200/50 dark:bg-white/5 rounded px-2 py-1">
                   TODAY
                 </span>
               </div>
 
-              {/* Message 1 */}
-              <div className="flex items-start gap-3 text-sm group">
-                <div className="w-8 h-8 rounded-md bg-rose-500 text-white font-bold flex items-center justify-center flex-shrink-0 text-xs shadow">
-                  A
+              {loadingMessages ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-500 py-12">
+                  <Loader2 className="animate-spin text-purple-500" size={24} />
+                  <span className="text-sm">Fetching conversation stream from Slack...</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-gray-800 dark:text-gray-200">Amit (Client Coordinator)</span>
-                    <span className="text-[10px] text-gray-400">1:42 PM</span>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-350 mt-1 leading-relaxed">
-                    Hey team! Flipkart wants us to send the revised creatives before 6 PM today. The client is waiting and this is extremely urgent.
-                  </p>
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full px-2.5 py-0.5 shadow-sm">
-                    <span>🤖 Scanned</span>
-                    <span className="text-gray-455 dark:text-gray-500">•</span>
-                    <span className="text-indigo-650 dark:text-indigo-400">Task Extracted</span>
-                  </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-12 text-gray-550 dark:text-gray-400">
+                  <p>No messages found in #{connectedChannel} yet.</p>
+                  <p className="text-xs text-gray-450 dark:text-gray-500 mt-1">Make sure you have invited the bot to the channel and sent some messages.</p>
                 </div>
-              </div>
+              ) : (
+                messages.map((msg, i) => {
+                  const colors = ["bg-rose-500", "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-indigo-500"];
+                  const charCodeSum = msg.sender.split("").reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+                  const colorClass = colors[charCodeSum % colors.length];
+                  const isActionable = hasTaskKeywords(msg.text);
 
-              {/* Message 2 */}
-              <div className="flex items-start gap-3 text-sm group border-t border-gray-100 dark:border-white/5 pt-3">
-                <div className="w-8 h-8 rounded-md bg-blue-500 text-white font-bold flex items-center justify-center flex-shrink-0 text-xs shadow">
-                  P
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-gray-800 dark:text-gray-200">Priya</span>
-                    <span className="text-[10px] text-gray-400">1:44 PM</span>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-350 mt-1 leading-relaxed">
-                    Understood. Rahul, can you please design the banner for the Google Ads campaign by tomorrow morning? Client review is at 11 AM.
-                  </p>
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full px-2.5 py-0.5 shadow-sm">
-                    <span>🤖 Scanned</span>
-                    <span className="text-gray-455 dark:text-gray-500">•</span>
-                    <span className="text-indigo-650 dark:text-indigo-400">Task Extracted</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Message 3 */}
-              <div className="flex items-start gap-3 text-sm group border-t border-gray-100 dark:border-white/5 pt-3">
-                <div className="w-8 h-8 rounded-md bg-emerald-500 text-white font-bold flex items-center justify-center flex-shrink-0 text-xs shadow">
-                  R
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-gray-800 dark:text-gray-200">Rahul</span>
-                    <span className="text-[10px] text-gray-400">1:45 PM</span>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-350 mt-1 leading-relaxed">
-                    Sure, I am on it right now. Will deliver it well before the deadline.
-                  </p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[9px] font-bold bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 rounded px-1.5 py-0.5">
-                    <span>Skipped</span>
-                    <span>•</span>
-                    <span>No actionable client request</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Message 4 */}
-              <div className="flex items-start gap-3 text-sm group border-t border-gray-100 dark:border-white/5 pt-3">
-                <div className="w-8 h-8 rounded-md bg-[#e5a823] text-white font-bold flex items-center justify-center flex-shrink-0 text-xs shadow">
-                  S
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-gray-800 dark:text-gray-200">Sanjay</span>
-                    <span className="text-[10px] text-gray-400">2:10 PM</span>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-350 mt-1 leading-relaxed">
-                    Bhai kal tak ek rough pitch deck banana hai Google ke naye campaign ke liye. Founder ko dikhana hai.
-                  </p>
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full px-2.5 py-0.5 shadow-sm">
-                    <span>🤖 Scanned</span>
-                    <span className="text-gray-455 dark:text-gray-500">•</span>
-                    <span className="text-indigo-650 dark:text-indigo-400">Task Extracted</span>
-                  </div>
-                </div>
-              </div>
+                  return (
+                    <div key={msg.id || i} className={`flex items-start gap-3 text-sm ${i > 0 ? "border-t border-gray-150 dark:border-white/5 pt-3" : ""}`}>
+                      <div className={`w-8 h-8 rounded-md ${colorClass} text-white font-bold flex items-center justify-center flex-shrink-0 text-xs shadow`}>
+                        {msg.sender.substring(0, 1).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-bold text-gray-800 dark:text-gray-200">{msg.sender}</span>
+                          <span className="text-[10px] text-gray-400">
+                            {msg.timestamp ? new Date(parseFloat(msg.timestamp) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-350 mt-1 leading-relaxed break-words">
+                          {msg.text}
+                        </p>
+                        {isActionable ? (
+                          <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 dark:border-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full px-2.5 py-0.5 shadow-sm">
+                            <span>🤖 Scanned</span>
+                            <span className="text-gray-455 dark:text-gray-500">•</span>
+                            <span className="text-indigo-650 dark:text-indigo-400">Task Extracted</span>
+                          </div>
+                        ) : (
+                          <div className="mt-1.5 inline-flex items-center gap-1.5 text-[9px] font-bold bg-gray-100 dark:bg-white/5 text-gray-450 dark:text-gray-500 rounded px-1.5 py-0.5">
+                            <span>Skipped</span>
+                            <span>•</span>
+                            <span>No actionable client request</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* Send bar block */}
             <div className="bg-gray-100 dark:bg-[#121214] px-4 py-3 flex items-center gap-3 border-t border-gray-250/60 dark:border-white/5 flex-shrink-0">
               <div className="flex-1 bg-gray-50 dark:bg-[#1c1c1f] rounded-xl px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 italic border border-gray-200 dark:border-white/5">
-                Channel stream feed is active. Simulated client history feed logs shown.
+                Channel stream feed is active. Displaying real-time workspace stream feed.
               </div>
               <button 
                 onClick={handleScan}

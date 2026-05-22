@@ -4,6 +4,14 @@ import { normalizeTranscript } from '../utils/parsers';
 import { analyzeMeetingTranscript, processMeetingTasks } from '../ai/meeting-analyzer.service';
 
 export async function pollGoogleMeetTranscripts(userId: string, auth: any) {
+  // Fetch current user's profile to resolve company
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("company")
+    .eq("id", userId)
+    .single();
+  const company = profile?.company || null;
+
   const drive = google.drive({ version: 'v3', auth });
   
   // Search for Google Doc transcripts created in the last 24 hours
@@ -52,11 +60,11 @@ export async function pollGoogleMeetTranscripts(userId: string, auth: any) {
       participants: [],
     });
 
-    // Save Meeting
     const { data: meeting, error: meetingError } = await supabaseAdmin
       .from('meetings')
       .insert({
         user_id: userId,
+        company,
         title,
         platform,
         meeting_date: date,

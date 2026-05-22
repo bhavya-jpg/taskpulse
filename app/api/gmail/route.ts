@@ -137,6 +137,14 @@ export async function GET(request: Request) {
   }
   const userId = session.user.id
 
+  // Fetch current user's profile to resolve company
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("company")
+    .eq("id", userId)
+    .single()
+  const company = profile?.company || null
+
   const cookieStore = await cookies()
   let token = cookieStore.get("gmail_token")?.value
   const refreshToken = cookieStore.get("gmail_refresh_token")?.value
@@ -316,6 +324,7 @@ Respond ONLY with the requested JSON array representing tasks found.`
               .from("tasks")
               .insert({
                 user_id: userId,
+                company,
                 title: task.task_title,
                 priority: task.priority || "Medium",
                 deadline: task.deadline || null,
@@ -323,7 +332,7 @@ Respond ONLY with the requested JSON array representing tasks found.`
                 confidence: task.confidence || 85,
                 status: task.confidence >= 85 ? "confirmed" : "unconfirmed",
                 source_platform: "email",
-                source_group_name: emailData.subject.substring(0, 50),
+                source_group_name: `${matchedClient} - ${emailData.subject.substring(0, 35)}`,
                 source_sender_name: emailData.from,
                 source_message_text: emailData.snippet,
                 source_message_id: emailData.id, // UNIQUE constraint prevents duplicate entries

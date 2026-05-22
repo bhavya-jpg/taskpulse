@@ -83,11 +83,20 @@ export async function processMeetingTasks(
   analysis: MeetingAnalysis,
   meetingMeta: { title: string; date: string; platform: string }
 ) {
+  // Fetch current user's profile to resolve company
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("company")
+    .eq("id", userId)
+    .single();
+  const company = profile?.company || null;
+
   const createdTasks = [];
 
   for (const item of analysis.action_items) {
     const task = {
       user_id: userId,
+      company,
       title: item.task,
       priority: item.priority || "Medium",
       deadline: item.deadline,

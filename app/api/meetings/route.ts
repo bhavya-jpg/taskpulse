@@ -9,12 +9,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = session.user.id;
+
   try {
-    const { data: meetings, error } = await supabaseAdmin
+    // 1. Fetch current user's profile to resolve company
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("company")
+      .eq("id", userId)
+      .single();
+
+    let query = supabaseAdmin
       .from("meetings")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("meeting_date", { ascending: false });
+      .select("*");
+
+    if (profile?.company) {
+      query = query.eq("company", profile.company);
+    } else {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data: meetings, error } = await query.order("meeting_date", { ascending: false });
 
     if (error) throw error;
 

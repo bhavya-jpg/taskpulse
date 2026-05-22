@@ -98,6 +98,14 @@ export async function fetchFathomMeetings(apiKey: string, cursor?: string): Prom
  * Returns the inserted meeting and the count of tasks created.
  */
 export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomMeeting) {
+  // Fetch current user's profile to resolve company
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("company")
+    .eq("id", userId)
+    .single();
+  const company = profile?.company || null;
+
   const shareUrl = fathomMeeting.share_url || fathomMeeting.url;
   const meetingTitle = fathomMeeting.title || fathomMeeting.meeting_title || "Fathom Meeting";
   const meetingDate = fathomMeeting.recording_start_time || fathomMeeting.scheduled_start_time || fathomMeeting.created_at || new Date().toISOString();
@@ -162,6 +170,7 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
 
     const meetingData = {
       user_id: userId,
+      company,
       title: meetingTitle,
       platform: "fathom",
       meeting_date: meetingDate,
@@ -218,6 +227,7 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
       taskTitles.add(item.description.trim().toLowerCase());
       const task = {
         user_id: userId,
+        company,
         title: item.description,
         priority: "Medium" as const,
         deadline: null,
@@ -307,6 +317,7 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
 
           const fallbackTask = {
             user_id: userId,
+            company,
             title: parsedTitle,
             priority: "Medium" as const,
             deadline: null,
