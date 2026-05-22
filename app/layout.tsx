@@ -10,7 +10,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'TaskPulse — AI-Powered Task Management',
-  description: 'AI-powered task management platform for creative agencies. Automatically extract tasks from WhatsApp and email.',
+  description: 'AI-powered task management platform for creative agencies. Automatically extract tasks from Slack and email.',
   icons: {
     icon: '/icon.svg',
   },
@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+      <body className="font-sans antialiased bg-gray-50 dark:bg-gray-950 transition-colors duration-300" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -15,8 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Send,
-  Sparkles,
   Loader2,
   BarChart2,
   Video,
@@ -25,9 +23,9 @@ import {
   Sun,
   Moon,
   Hash,
-  RefreshCw,
-  LogOut,
+  ArrowLeft,
 } from "lucide-react";
+import Link from "next/link";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { MeetingTab } from "@/components/MeetingTab";
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -37,7 +35,7 @@ import { useRouter } from "next/navigation";
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "whatsapp" | "email" | "slack" | "zoom" | "google_meet" | "fathom";
+type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom";
 type Status = "pending" | "done";
 
 interface Task {
@@ -64,16 +62,16 @@ const EMPLOYEES = ["Rahul", "Priya", "Admin", "Vikas"];
 const CLIENTS = ["Flipkart", "Zomato", "Amazon", "Google"];
 
 const CLIENT_COLORS: Record<string, { bg: string; text: string; border: string; header: string }> = {
-  Flipkart: { bg: "bg-blue-50/80 dark:bg-blue-950/20", text: "text-blue-600 dark:text-blue-400", border: "border-blue-200 dark:border-blue-900/40", header: "bg-blue-600 dark:bg-blue-800" },
-  Zomato:   { bg: "bg-rose-50/80 dark:bg-rose-950/20",  text: "text-rose-600 dark:text-rose-400",  border: "border-rose-200 dark:border-rose-900/40",  header: "bg-rose-600 dark:bg-rose-800"  },
-  Amazon:   { bg: "bg-amber-50/80 dark:bg-amber-950/20", text: "text-amber-600 dark:text-amber-400", border: "border-amber-200 dark:border-amber-900/40", header: "bg-amber-500 dark:bg-amber-700" },
-  Google:   { bg: "bg-emerald-50/80 dark:bg-emerald-950/20", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-200 dark:border-emerald-900/40", header: "bg-emerald-600 dark:bg-emerald-800" },
+  Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+  Zomato:   { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
+  Amazon:   { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
+  Google:   { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
 };
 
 const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; bg: string; border: string }> = {
-  High:   { dot: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse", text: "text-red-700 dark:text-red-400", bg: "bg-red-50/50 dark:bg-red-950/10", border: "border-red-200/60 dark:border-red-900/30" },
-  Medium: { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50/50 dark:bg-amber-950/10", border: "border-amber-200/60 dark:border-amber-900/30" },
-  Low:    { dot: "bg-sky-500", text: "text-sky-700 dark:text-sky-400", bg: "bg-sky-50/50 dark:bg-sky-950/10", border: "border-sky-200/60 dark:border-sky-900/30" },
+  High:   { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300", bg: "bg-amber-50/60 dark:bg-amber-500/10", border: "border-amber-200/60 dark:border-amber-500/20" },
+  Medium: { dot: "bg-teal-500", text: "text-teal-700 dark:text-teal-300", bg: "bg-teal-50/60 dark:bg-teal-500/10", border: "border-teal-200/60 dark:border-teal-500/20" },
+  Low:    { dot: "bg-slate-500", text: "text-slate-600 dark:text-slate-300", bg: "bg-slate-100/60 dark:bg-slate-700/20", border: "border-slate-200/70 dark:border-slate-600/40" },
 };
 
 const PRIORITY_ORDER: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
@@ -103,11 +101,11 @@ function ToastContainer({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: nu
             initial={{ opacity: 0, x: 80 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 80 }}
-            className="pointer-events-auto bg-white border border-green-200 shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 min-w-[260px] dark:bg-[#121214] dark:border-green-950"
+            className="pointer-events-auto bg-white border border-slate-200/70 shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 min-w-[260px] dark:bg-[#15171b] dark:border-slate-700/60"
           >
-            <span className="text-green-500 text-lg">✅</span>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 flex-1">{t.message}</span>
-            <button onClick={() => dismiss(t.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer bg-transparent border-0">
+            <CheckCircle2 size={16} className="text-teal-600" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{t.message}</span>
+            <button onClick={() => dismiss(t.id)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer bg-transparent border-0">
               <X size={14} />
             </button>
           </motion.div>
@@ -132,7 +130,7 @@ function TaskCard({
   const [showBlockerModal, setShowBlockerModal] = useState(false);
   const [tempNote, setTempNote] = useState(task.blockerNote || "");
   const pc = PRIORITY_CONFIG[task.priority];
-  const cc = CLIENT_COLORS[task.client] || { bg: "bg-gray-100 dark:bg-gray-900/40", text: "text-gray-700 dark:text-gray-300", border: "border-gray-300 dark:border-white/10" };
+  const cc = CLIENT_COLORS[task.client] || { bg: "bg-slate-100 dark:bg-slate-700/30", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/50" };
   const overdue = isOverdue(task.deadline) && task.status !== "done";
 
   return (
@@ -141,7 +139,7 @@ function TaskCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className={`bg-white dark:bg-[#121214] rounded-xl shadow-sm hover:shadow-md border transition-all duration-300 overflow-hidden group ${task.isBlocked ? "border-red-400 dark:border-red-805" : "border-gray-200/60 dark:border-white/5"} hover:border-indigo-500/20 dark:hover:border-indigo-500/20`}
+      className={`bg-white dark:bg-[#15171b] rounded-2xl shadow-sm hover:shadow-md border transition-all duration-300 overflow-hidden group ${task.isBlocked ? "border-amber-400/60 dark:border-amber-500/30" : "border-slate-200/70 dark:border-slate-700/60"} hover:border-teal-500/40 dark:hover:border-teal-500/40`}
     >
       <div className="p-4 pb-0 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
@@ -156,79 +154,79 @@ function TaskCard({
           </div>
           
           {task.source === "slack" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-purple-50/50 dark:bg-purple-950/15 border-purple-200/50 dark:border-purple-900/35 text-purple-700 dark:text-purple-400 shadow-sm">
-              <MessageCircle size={10} className="rotate-90 text-purple-500" />
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <MessageCircle size={10} className="rotate-90 text-teal-500" />
               Slack
             </span>
           ) : task.source === "email" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
-              <Mail size={10} className="text-blue-500" />
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <Mail size={10} className="text-teal-500" />
               Gmail
             </span>
           ) : task.source === "fathom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-violet-50/50 dark:bg-violet-950/15 border-violet-200/50 dark:border-violet-900/35 text-violet-700 dark:text-violet-400 shadow-sm">
-              <Video size={10} className="text-violet-500" />
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <Video size={10} className="text-teal-500" />
               Fathom
             </span>
           ) : task.source === "zoom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-blue-50/50 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-900/35 text-blue-700 dark:text-blue-400 shadow-sm">
-              <Video size={10} className="text-blue-500" />
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <Video size={10} className="text-teal-500" />
               Zoom
             </span>
           ) : task.source === "google_meet" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
-              <Video size={10} className="text-emerald-500" />
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <Video size={10} className="text-teal-500" />
               Google Meet
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-200/50 dark:border-emerald-900/35 text-emerald-700 dark:text-emerald-400 shadow-sm">
-              <MessageCircle size={10} className="text-emerald-500" />
-              WhatsApp
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+              <Inbox size={10} className="text-teal-500" />
+              Feed
             </span>
           )}
         </div>
       </div>
 
       <div className="p-4 pt-0 flex flex-col gap-3">
-        <h4 className={`font-semibold text-[14px] leading-snug text-gray-800 dark:text-gray-150 ${task.status === "done" ? "line-through text-gray-400 dark:text-gray-600" : ""}`}>
+        <h4 className={`font-semibold text-[14px] leading-snug text-slate-900 dark:text-slate-100 ${task.status === "done" ? "line-through text-slate-400 dark:text-slate-500" : ""}`}>
           {task.title}
         </h4>
 
         {task.isBlocked && (
-          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg p-2.5 flex items-start gap-2 text-xs text-red-800 dark:text-red-300 font-medium">
-            <span className="text-sm flex-shrink-0">⚠️</span>
+          <div className="bg-amber-50/80 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 font-medium">
+            <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <span className="font-extrabold uppercase text-[10px] text-red-650 dark:text-red-400 block mb-0.5">Blocker Active</span>
-              <p className="italic text-[11px] leading-relaxed break-words">"{task.blockerNote}"</p>
+              <span className="font-semibold uppercase text-[10px] text-amber-700 dark:text-amber-200 block mb-0.5">Blocker Active</span>
+              <p className="text-[11px] leading-relaxed break-words">"{task.blockerNote}"</p>
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
-              <User size={10} className="text-indigo-650 dark:text-indigo-400" />
+            <div className="w-5 h-5 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center border border-teal-200/60 dark:border-teal-500/20">
+              <User size={10} className="text-teal-600 dark:text-teal-300" />
             </div>
-            <span className="font-bold text-gray-700 dark:text-gray-300">{task.assignedTo}</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Calendar size={11} className={overdue ? "text-red-500 dark:text-red-400" : "text-gray-400"} />
-            <span className={overdue ? "text-red-600 dark:text-red-400 font-bold" : "font-semibold text-gray-600 dark:text-gray-300"}>
+            <Calendar size={11} className={overdue ? "text-amber-600 dark:text-amber-400" : "text-slate-400"} />
+            <span className={overdue ? "text-amber-700 dark:text-amber-300 font-semibold" : "font-semibold text-slate-600 dark:text-slate-300"}>
               {formatDate(task.deadline)}
             </span>
           </div>
         </div>
 
-        <div className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 bg-gray-50/80 dark:bg-[#1a1a1f] px-2 py-1.5 rounded-lg border border-gray-100 dark:border-white/5 font-semibold">
+        <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-50 dark:bg-[#1a1c20] px-2 py-1.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 font-semibold">
           <span className="whitespace-normal break-words">
-            📁 {task.sourceGroup}
+            Source: {task.sourceGroup}
           </span>
         </div>
 
-        <div className="border-t border-gray-100 dark:border-white/5 pt-3 mt-1">
+        <div className="border-t border-slate-200/70 dark:border-slate-700/60 pt-3 mt-1">
           <button
             onClick={() => setShowSource((p) => !p)}
-            className="flex items-center justify-between w-full text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-bold transition-colors cursor-pointer bg-transparent border-none outline-none"
+            className="flex items-center justify-between w-full text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold transition-colors cursor-pointer bg-transparent border-none outline-none"
           >
             <span className="flex items-center gap-1.5">
               {showSource ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -245,9 +243,9 @@ function TaskCard({
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-[#f8fafc] dark:bg-black/30 border border-gray-200/50 dark:border-white/5 rounded-lg p-3 text-[11px] text-gray-700 dark:text-gray-350 relative shadow-inner">
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500 dark:bg-indigo-700 rounded-l-lg" />
-                  <p className="whitespace-normal leading-relaxed break-words font-medium italic">
+                <div className="bg-slate-50 dark:bg-[#14161a] border border-slate-200/60 dark:border-slate-700/60 rounded-lg p-3 text-[11px] text-slate-700 dark:text-slate-300 relative shadow-inner">
+                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-teal-500 dark:bg-teal-500 rounded-l-lg" />
+                  <p className="whitespace-normal leading-relaxed break-words font-medium">
                     "{task.sourceMessage}"
                   </p>
                 </div>
@@ -263,19 +261,19 @@ function TaskCard({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-red-50/50 dark:bg-red-950/10 border border-red-205 dark:border-red-900/25 rounded-xl p-3 flex flex-col gap-2 overflow-hidden"
+              className="bg-amber-50/70 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 rounded-xl p-3 flex flex-col gap-2 overflow-hidden"
             >
-              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Describe the Blocker / Question</span>
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-200 uppercase tracking-wider">Describe the blocker</span>
               <textarea
                 value={tempNote}
                 onChange={(e) => setTempNote(e.target.value)}
                 placeholder="e.g. Missing copy assets from client..."
-                className="w-full bg-white dark:bg-[#121214] border border-gray-200 dark:border-white/10 rounded-lg p-2 text-xs text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-red-500 min-h-[60px] resize-none"
+                className="w-full bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-lg p-2 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-400 min-h-[60px] resize-none"
               />
               <div className="flex justify-end gap-1.5 mt-1">
                 <button
                   onClick={() => setShowBlockerModal(false)}
-                  className="px-2.5 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-200/50 dark:hover:bg-white/5 rounded-md cursor-pointer bg-transparent border-none"
+                  className="px-2.5 py-1 text-[10px] font-semibold text-slate-500 hover:bg-slate-200/60 dark:hover:bg-slate-700/40 rounded-md cursor-pointer bg-transparent border-none"
                 >
                   Cancel
                 </button>
@@ -287,7 +285,7 @@ function TaskCard({
                       setShowBlockerModal(false);
                     }
                   }}
-                  className="px-3 py-1 bg-red-650 hover:bg-red-750 text-white text-[10px] font-bold rounded-md shadow-sm cursor-pointer border-none"
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-semibold rounded-md shadow-sm cursor-pointer border-none"
                 >
                   Raise Blocker
                 </button>
@@ -302,7 +300,7 @@ function TaskCard({
               {onMarkDone && (
                 <button
                   onClick={() => onMarkDone?.(task.id)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
                 >
                   <CheckCircle2 size={13} /> Mark as Done
                 </button>
@@ -317,13 +315,13 @@ function TaskCard({
                       setShowBlockerModal(true);
                     }
                   }}
-                  className={`w-full text-[11px] font-bold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border cursor-pointer ${
+                  className={`w-full text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border cursor-pointer ${
                     task.isBlocked 
-                      ? "bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-950/20 dark:hover:bg-red-955 dark:text-red-400 dark:border-red-900/30"
-                      : "bg-white dark:bg-[#1a1a1f] hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 border-gray-200/80 dark:border-white/5 dark:hover:border-red-500/30"
+                      ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30"
+                      : "bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30"
                   }`}
                 >
-                  ⚠️ {task.isBlocked ? "Resolve Blocker" : "Report Blocker / Clarify"}
+                  {task.isBlocked ? "Resolve blocker" : "Report blocker"}
                 </button>
               )}
             </div>
@@ -338,9 +336,11 @@ function TaskCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-white dark:bg-white/5 rounded-xl border border-dashed border-gray-300 dark:border-white/10 shadow-sm w-full">
-      <span className="text-3xl mb-2 grayscale opacity-50 dark:opacity-30">👻</span>
-      <p className="text-gray-500 dark:text-gray-400 text-[13px] font-semibold">{message}</p>
+    <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-white dark:bg-[#15171b] rounded-2xl border border-dashed border-slate-200/70 dark:border-slate-700/60 shadow-sm w-full">
+      <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-700/40 flex items-center justify-center mb-3">
+        <Inbox size={18} className="text-slate-400 dark:text-slate-300" />
+      </div>
+      <p className="text-slate-600 dark:text-slate-300 text-sm font-semibold">{message}</p>
     </div>
   );
 }
@@ -349,13 +349,13 @@ function EmptyState({ message }: { message: string }) {
 
 function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   return (
-    <div className="bg-white dark:bg-[#18181b] rounded-xl shadow-sm border border-gray-100 dark:border-white/10 p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
+    <div className="bg-white dark:bg-[#15171b] rounded-2xl shadow-sm border border-slate-200/70 dark:border-slate-700/60 p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}</p>
+        <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{label}</p>
       </div>
     </div>
   );
@@ -374,7 +374,7 @@ function DashboardView({
   onMarkDone: (id: number | string) => void;
   onToggleBlocker: (id: number | string, isBlocked: boolean, note?: string) => void;
 }) {
-  const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "whatsapp" | "fathom">("all");
+  const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
   const sourceFiltered = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
   // Strictly filter to current logged-in employee
@@ -389,33 +389,30 @@ function DashboardView({
     return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
   });
 
-  const sources: { id: "all" | "email" | "slack" | "whatsapp" | "fathom"; label: string; icon: React.ReactNode }[] = [
-    { id: "all", label: "All My Tasks", icon: <Inbox size={13} /> },
-    { id: "email", label: "Gmail", icon: <Mail size={13} /> },
-    { id: "slack", label: "Slack Teams", icon: <MessageCircle size={13} className="rotate-90 text-purple-500" /> },
-    { id: "whatsapp", label: "WhatsApp Chats", icon: <MessageCircle size={13} className="text-emerald-500" /> },
-    { id: "fathom", label: "Fathom Meetings", icon: <Video size={13} className="text-violet-500" /> },
+  const sources: { id: "all" | "email" | "slack" | "fathom"; label: string; icon: React.ReactNode }[] = [
+    { id: "all", label: "All My Tasks", icon: <Inbox size={13} className="text-teal-500" /> },
+    { id: "email", label: "Gmail", icon: <Mail size={13} className="text-teal-500" /> },
+    { id: "slack", label: "Slack Teams", icon: <MessageCircle size={13} className="rotate-90 text-teal-500" /> },
+    { id: "fathom", label: "Fathom Meetings", icon: <Video size={13} className="text-teal-500" /> },
   ];
 
   return (
     <div className="flex flex-col gap-8">
       {/* Employee Greeting Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-500 dark:from-indigo-950 dark:via-purple-900/40 dark:to-indigo-900/60 rounded-2xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border dark:border-white/5">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+      <div className="bg-white/80 dark:bg-[#15171b] rounded-3xl p-6 md:p-8 text-slate-900 dark:text-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border border-slate-200/70 dark:border-slate-700/60">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(13,148,136,0.12),transparent_55%)]" />
         <div className="relative z-10 w-full">
-          <h2 className="text-2xl font-bold mb-3 flex items-center gap-2">
-            <Sparkles size={24} className="text-yellow-300 animate-pulse" />
-            Employee Console: {empName}
-          </h2>
-          <p className="text-indigo-100 dark:text-indigo-200/80 text-sm md:text-base max-w-3xl leading-relaxed font-semibold">
-            Track and complete your assigned deliverables. Flag blocker alerts directly to keep the Founder updated instantly, resolve dependencies seamlessly, and manage inbox/meeting extracted handoffs.
+          <span className="text-xs uppercase tracking-[0.2em] text-teal-600 dark:text-teal-400 font-semibold">Employee workspace</span>
+          <h2 className="text-2xl md:text-3xl font-semibold mt-3">Welcome back, {empName}</h2>
+          <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base max-w-3xl leading-relaxed mt-3">
+            Stay on top of your assigned deliverables, resolve blockers quickly, and keep every client request accountable.
           </p>
         </div>
       </div>
 
       {/* Segmented Filter Control */}
-      <div className="flex justify-between items-center bg-white dark:bg-[#121214] p-3 rounded-2xl border border-gray-200/60 dark:border-white/5 shadow-sm">
-        <div className="flex flex-wrap gap-1.5 p-1 bg-gray-100/50 dark:bg-white/5 rounded-xl border border-gray-200/40 dark:border-white/5 shadow-inner">
+      <div className="flex justify-between items-center bg-white dark:bg-[#15171b] p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
+        <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/70 dark:bg-slate-700/30 rounded-xl border border-slate-200/60 dark:border-slate-600/50">
           {sources.map((src) => {
             const active = selectedSource === src.id;
             return (
@@ -424,8 +421,8 @@ function DashboardView({
                 onClick={() => setSelectedSource(src.id)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-250 cursor-pointer ${
                   active
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-white/5"
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40"
                 }`}
               >
                 {src.icon}
@@ -434,31 +431,31 @@ function DashboardView({
             );
           })}
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 px-3">
-          <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span>Scanner Sync Active</span>
+        <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 px-3">
+          <span className="inline-block w-2 h-2 rounded-full bg-teal-500" />
+          <span>Sync active</span>
         </div>
       </div>
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Column 1: Active Tasks */}
-        <div className="bg-indigo-50/20 dark:bg-indigo-950/5 rounded-2xl p-4 flex flex-col gap-4 border border-indigo-100/50 dark:border-indigo-950/20 shadow-sm min-h-[500px]">
+        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(79,70,229,0.5)] animate-pulse" />
-                <h3 className="font-extrabold text-gray-800 dark:text-indigo-100 text-[15px]">My Active Tasks</h3>
+                <div className="w-2 h-2 rounded-full bg-teal-500" />
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">My Active Tasks</h3>
               </div>
-              <span className="bg-white dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-extrabold rounded-full px-2.5 py-1 border border-indigo-100/50 dark:border-indigo-900/30 shadow-sm">{sorted.length}</span>
+              <span className="bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-teal-200/60 dark:border-teal-500/30 shadow-sm">{sorted.length}</span>
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-indigo-300/40 font-semibold">Deliverables assigned to you currently pending execution.</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Deliverables assigned to you and ready to execute.</p>
           </div>
 
           <div className="flex flex-col gap-3">
             <AnimatePresence>
               {sorted.length === 0 ? (
-                <EmptyState message="All caught up! Excellent work. 🎉" />
+                <EmptyState message="All caught up. No active tasks right now." />
               ) : (
                 sorted.map((t) => (
                   <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} onToggleBlocker={onToggleBlocker} />
@@ -469,16 +466,16 @@ function DashboardView({
         </div>
 
         {/* Column 2: Completed */}
-        <div className="bg-emerald-50/20 dark:bg-emerald-950/5 rounded-2xl p-4 flex flex-col gap-4 border border-emerald-100/40 dark:border-emerald-950/20 shadow-sm min-h-[500px]">
+        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
-                <h3 className="font-extrabold text-gray-800 dark:text-emerald-100 text-[15px]">Completed By Me</h3>
+                <div className="w-2 h-2 rounded-full bg-slate-400" />
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">Completed</h3>
               </div>
-              <span className="bg-white dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold rounded-full px-2.5 py-1 border border-emerald-100/40 dark:border-emerald-900/30 shadow-sm">{done.length}</span>
+              <span className="bg-slate-100 dark:bg-slate-700/40 text-slate-700 dark:text-slate-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-slate-200/60 dark:border-slate-600/50 shadow-sm">{done.length}</span>
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-emerald-300/40 font-semibold">Tasks you have successfully finalized.</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Tasks that are already delivered.</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -523,15 +520,15 @@ function ClientView({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-150 mb-1">My Tasks By Client</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{pending.length} pending deliverables assigned to you across all clients</p>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">My Tasks By Client</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{pending.length} pending deliverables assigned to you across all clients</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatBox icon={<BarChart2 size={18} className="text-indigo-600 dark:text-indigo-400" />} label="My Tasks" value={total} color="bg-indigo-50 dark:bg-indigo-950/20" />
-        <StatBox icon={<AlertTriangle size={18} className="text-red-500 dark:text-red-400" />} label="High Priority" value={highPriority} color="bg-red-50 dark:bg-red-950/20" />
-        <StatBox icon={<Clock size={18} className="text-orange-500 dark:text-orange-400" />} label="Overdue" value={overdue} color="bg-orange-50 dark:bg-orange-950/20" />
-        <StatBox icon={<CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />} label="Completed" value={done} color="bg-green-50 dark:bg-green-950/20" />
+        <StatBox icon={<BarChart2 size={18} className="text-teal-600 dark:text-teal-300" />} label="My Tasks" value={total} color="bg-teal-50 dark:bg-teal-500/10" />
+        <StatBox icon={<AlertTriangle size={18} className="text-amber-600 dark:text-amber-300" />} label="High Priority" value={highPriority} color="bg-amber-50 dark:bg-amber-500/10" />
+        <StatBox icon={<Clock size={18} className="text-amber-600 dark:text-amber-300" />} label="Overdue" value={overdue} color="bg-amber-50 dark:bg-amber-500/10" />
+        <StatBox icon={<CheckCircle2 size={18} className="text-slate-600 dark:text-slate-300" />} label="Completed" value={done} color="bg-slate-100 dark:bg-slate-700/30" />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -542,7 +539,7 @@ function ClientView({
           const open = !collapsed[client];
 
           return (
-            <div key={client} className="bg-white dark:bg-[#18181b] rounded-xl shadow-md overflow-hidden border border-gray-100 dark:border-white/10">
+            <div key={client} className="bg-white dark:bg-[#15171b] rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-slate-700/60">
               <button
                 className={`w-full flex items-center justify-between px-5 py-4 ${cc.header} text-white transition-all cursor-pointer border-0 outline-none`}
                 onClick={() => setCollapsed((p) => ({ ...p, [client]: !p[client] }))}
@@ -567,13 +564,13 @@ function ClientView({
                   >
                     <div className="px-5 pt-4 pb-2">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="flex-1 bg-gray-100 dark:bg-white/5 rounded-full h-2">
+                        <div className="flex-1 bg-slate-100 dark:bg-slate-700/40 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full ${cc.header}`}
                             style={{ width: clientTasks.length ? `${(clientDone / clientTasks.length) * 100}%` : "0%" }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                           {clientDone}/{clientTasks.length} done
                         </span>
                       </div>
@@ -648,22 +645,46 @@ export default function EmployeeDashboard() {
         const pData = await pRes.json();
         if (pData && pData.profile) {
           if (pData.profile.designation === "founder") {
-            router.push("/");
+            router.push("/founder");
             return;
           }
           setProfile(pData.profile);
+          localStorage.setItem("taskpulse_onboarding", JSON.stringify(pData.profile));
         } else {
-          router.push("/");
+          // Sync check with localStorage
+          const localData = localStorage.getItem("taskpulse_onboarding");
+          if (localData) {
+            try {
+              const parsed = JSON.parse(localData);
+              if (parsed.designation === "employee") {
+                // Sync it
+                await fetch("/api/profile", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name: parsed.name,
+                    email: session?.user?.email || "",
+                    company: parsed.company,
+                    designation: "employee",
+                  }),
+                });
+                setProfile(parsed);
+                await loadTasks();
+                return;
+              }
+            } catch (e) {}
+          }
+          router.push("/founder");
           return;
         }
       } else {
-        router.push("/");
+        router.push("/founder");
         return;
       }
       await loadTasks();
     } catch (err) {
       console.error("Failed to load profile/tasks in employee console:", err);
-      router.push("/");
+      router.push("/founder");
     } finally {
       setLoadingProfile(false);
     }
@@ -733,15 +754,15 @@ export default function EmployeeDashboard() {
     }
     localStorage.removeItem("taskpulse_onboarding");
     addToast("Designation cleared!");
-    router.push("/");
+    router.push("/founder");
   };
 
   if (status === "loading" || loadingTasks || loadingProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#121316]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-xs text-gray-500 font-semibold animate-pulse">Loading employee workspace...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          <p className="text-xs text-slate-500 font-semibold animate-pulse">Loading workspace...</p>
         </div>
       </div>
     );
@@ -756,14 +777,23 @@ export default function EmployeeDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
+    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#121316] transition-colors duration-300">
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
 
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-black/50 backdrop-blur-md shadow-sm border-b border-gray-100 dark:border-gray-800 h-[60px] flex items-center px-6 transition-colors duration-300">
-        <div className="flex items-center gap-2 min-w-[160px]">
-          <span className="text-xl">📋</span>
-          <span className="font-extrabold text-gray-900 dark:text-white text-lg tracking-tight">TaskPulse</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/20 dark:border-indigo-900/30">Staff</span>
+      <header className="sticky top-0 z-50 bg-[#f7f6f2]/90 dark:bg-[#121316]/90 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-700/60 h-[64px] flex items-center px-6 transition-colors duration-300">
+        <div className="flex items-center gap-4 min-w-[240px]">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+          >
+            <ArrowLeft size={14} />
+            Back to landing
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center text-xs font-semibold">TP</div>
+            <span className="font-semibold text-slate-900 dark:text-white text-lg tracking-tight">TaskPulse</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-200 border border-teal-200/60 dark:border-teal-500/20">Staff</span>
+          </div>
         </div>
 
         <div className="flex items-center ml-4">
@@ -777,8 +807,8 @@ export default function EmployeeDashboard() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-0 ${
                 activeTab === tab.id
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40"
               }`}
             >
               {tab.icon}
@@ -789,28 +819,28 @@ export default function EmployeeDashboard() {
 
         <div className="flex items-center gap-4 min-w-[260px] justify-end">
           {session?.user && (
-            <div className="flex items-center gap-2 bg-gray-100/50 dark:bg-white/5 border border-gray-200/50 dark:border-white/10 rounded-xl px-2 py-1 shadow-sm">
+            <div className="flex items-center gap-2 bg-white/70 dark:bg-slate-700/30 border border-slate-200/60 dark:border-slate-600/50 rounded-xl px-2 py-1 shadow-sm">
               {session.user.image ? (
                 <img
                   src={session.user.image}
                   alt={session.user.name || "User"}
-                  className="w-5 h-5 rounded-full border border-gray-200/50 dark:border-white/10"
+                  className="w-5 h-5 rounded-full border border-slate-200/60 dark:border-slate-600/50"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
-                  <User size={10} className="text-indigo-605 dark:text-indigo-400" />
+                <div className="w-5 h-5 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center border border-teal-200/60 dark:border-teal-500/20">
+                  <User size={10} className="text-teal-600 dark:text-teal-300" />
                 </div>
               )}
               <button
                 onClick={clearDesignation}
-                className="text-[10px] font-extrabold text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors uppercase tracking-wider cursor-pointer border-r border-gray-200 dark:border-white/10 pr-2 mr-2 bg-transparent border-t-0 border-b-0 border-l-0"
+                className="text-[10px] font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-300 dark:hover:text-teal-200 transition-colors uppercase tracking-wider cursor-pointer border-r border-slate-200/60 dark:border-slate-600/50 pr-2 mr-2 bg-transparent border-t-0 border-b-0 border-l-0"
                 title="Switch Role"
               >
                 Switch Role
               </button>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="text-[10px] font-extrabold text-gray-500 hover:text-red-650 dark:text-gray-400 dark:hover:text-red-400 transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-0 outline-none"
+                className="text-[10px] font-semibold text-slate-500 hover:text-amber-700 dark:text-slate-400 dark:hover:text-amber-300 transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-0 outline-none"
                 title="Sign Out"
               >
                 Sign Out
@@ -820,13 +850,13 @@ export default function EmployeeDashboard() {
 
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-gray-200/50 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 shadow-sm flex items-center justify-center cursor-pointer"
+            className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40 transition-all border border-slate-200/60 dark:border-slate-600/50 hover:border-slate-300 dark:hover:border-slate-500 shadow-sm flex items-center justify-center cursor-pointer"
             title="Toggle Theme"
           >
             {mounted && theme === "dark" ? (
-              <Sun size={15} className="text-yellow-500" />
+              <Sun size={15} className="text-amber-500" />
             ) : (
-              <Moon size={15} className="text-indigo-606 dark:text-indigo-450" />
+              <Moon size={15} className="text-teal-600 dark:text-teal-300" />
             )}
           </button>
         </div>
@@ -867,17 +897,19 @@ export default function EmployeeDashboard() {
               />
             )}
             {activeTab === "email" && (
-              <div className="bg-white dark:bg-[#121214] border border-gray-200/60 dark:border-white/5 rounded-2xl p-8 text-center max-w-xl mx-auto">
-                <span className="text-4xl mb-4 block">📧</span>
-                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Gmail Inbox Extraction</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
-                  Your email extractors are configured centrally by the organization Founder. Any new deliverables scanned and assigned to your roster profile will automatically appear in your active task column.
+              <div className="bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-2xl p-8 text-center max-w-xl mx-auto">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700/40 flex items-center justify-center mx-auto mb-4">
+                  <Mail size={20} className="text-teal-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Gmail Inbox Extraction</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                  Email extraction is managed by the organization owner. New deliverables assigned to your profile will appear in your active task list automatically.
                 </p>
                 <button
                   onClick={() => setActiveTab("dashboard")}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer border-none"
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer border-none"
                 >
-                  Return to Dashboard
+                  Return to dashboard
                 </button>
               </div>
             )}

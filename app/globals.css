@@ -123,3 +123,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes floatSlow {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@layer utilities {
+  .animate-float-slow {
+    animation: floatSlow 10s ease-in-out infinite;
+  }
+}
