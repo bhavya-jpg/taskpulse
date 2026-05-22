@@ -7,6 +7,11 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ['@whiskeysockets/baileys'],
+  experimental: {
+    turbopack: {
+      root: '.',
+    },
+  },
 }
 
 export default nextConfig
