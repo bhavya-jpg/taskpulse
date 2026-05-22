@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Video, FileText, Upload, Plus, Calendar, User, CheckCircle2, AlertCircle, Loader2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Video, FileText, Upload, Plus, Calendar, User, CheckCircle2, AlertCircle, Loader2, ChevronDown, ChevronUp, RefreshCw, Sparkles } from "lucide-react";
 
 interface Meeting {
   id: string;
@@ -310,197 +310,272 @@ export function MeetingTab() {
         </div>
       </div>
 
-      {isUploading && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-xl"
-        >
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-gray-800 dark:text-gray-100">Upload Meeting Transcript</h3>
-            <button onClick={() => setIsUploading(false)} className="text-gray-400 hover:text-gray-600">
-              <Plus className="rotate-45" />
-            </button>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr] gap-8 items-start">
+        {/* Left Side: Connection Guide */}
+        <div className="bg-gray-100/50 dark:bg-[#121214]/60 p-6 md:p-8 rounded-2xl border border-gray-200/50 dark:border-white/5 space-y-6">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 tracking-wide uppercase">
+              <Sparkles size={16} className="text-violet-500 animate-pulse" />
+              Connecting Meeting Assistants
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed font-semibold">
+              Integrate your conferencing tools to automatically transcribe discussions and extract actionable tasks via Gemini AI.
+            </p>
           </div>
-          
-          <form onSubmit={handleUpload} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Meeting Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Q3 Planning Meeting"
-                  className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={uploadData.title}
-                  onChange={e => setUploadData({...uploadData, title: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Platform</label>
-                <select
-                  className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none"
-                  value={uploadData.platform}
-                  onChange={e => setUploadData({...uploadData, platform: e.target.value})}
-                >
-                  <option value="manual">Manual Upload</option>
-                  <option value="zoom">Zoom</option>
-                  <option value="google_meet">Google Meet</option>
-                  <option value="teams">MS Teams</option>
-                  <option value="fathom">Fathom</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date</label>
-                <input
-                  type="date"
-                  className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none"
-                  value={uploadData.date}
-                  onChange={e => setUploadData({...uploadData, date: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Participants</label>
-                <input
-                  type="text"
-                  placeholder="John, Priya, Rahul"
-                  className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none"
-                  value={uploadData.participants}
-                  onChange={e => setUploadData({...uploadData, participants: e.target.value})}
-                />
-              </div>
-            </div>
-            
+
+          <div className="space-y-6 text-sm text-gray-650 dark:text-gray-400">
+            {/* Option 1: Fathom */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Transcript File (.vtt, .txt)</label>
-              <div className="border-2 border-dashed border-gray-200 dark:border-white/5 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors cursor-pointer relative">
-                <input
-                  type="file"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={e => setUploadData({...uploadData, transcript: e.target.files?.[0] || null})}
-                />
-                <Upload className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {uploadData.transcript ? uploadData.transcript.name : "Click to select or drag and drop"}
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-105 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400 font-extrabold flex items-center justify-center text-xs">1</span>
+                <p className="font-extrabold text-gray-850 dark:text-gray-200">Fathom Video Recorder (Recommended)</p>
+              </div>
+              <p className="text-xs text-gray-500 pl-7 leading-relaxed font-medium">
+                Fathom records, transcribes, and highlights key moments in Zoom, Google Meet, or Microsoft Teams.
+              </p>
+              <div className="pl-7 space-y-1.5 text-xs text-gray-500 font-semibold">
+                <p>• Sign up for a free account at <a href="https://fathom.video" target="_blank" rel="noreferrer" className="text-violet-500 hover:underline">fathom.video</a>.</p>
+                <p>• Link it to your calendar so the Fathom companion app automatically joins your calls.</p>
+                <p>• Hit the <strong className="text-violet-600 dark:text-violet-400">Sync Fathom</strong> button above to pull the summary and transcription directly.</p>
               </div>
             </div>
 
-            <button
-              disabled={isProcessing}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="animate-spin" size={20} />
-                  Processing with Gemini AI...
-                </>
-              ) : (
-                <>Process Transcript</>
-              )}
-            </button>
-          </form>
-        </motion.div>
-      )}
+            {/* Option 2: Google Meet */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-105 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-extrabold flex items-center justify-center text-xs">2</span>
+                <p className="font-extrabold text-gray-850 dark:text-gray-200">Google Meet Calendars</p>
+              </div>
+              <p className="text-xs text-gray-500 pl-7 leading-relaxed font-medium">
+                Sync Google Meet conversations scheduled on your professional Google Calendar.
+              </p>
+              <div className="pl-7 space-y-1.5 text-xs text-gray-500 font-semibold">
+                <p>• Make sure you connect your corporate Google profile in the <strong className="text-indigo-650 dark:text-indigo-400">Email tab</strong>.</p>
+                <p>• Ensure Google Meet transcripts or calendar details are linked to that email account.</p>
+                <p>• Click <strong className="text-indigo-655 dark:text-indigo-400">Sync Google Meet</strong> to analyze upcoming/past meetings.</p>
+              </div>
+            </div>
 
-      {/* Meetings List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="animate-spin text-indigo-500" />
+            {/* Option 3: Manual Upload */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-105 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-extrabold flex items-center justify-center text-xs">3</span>
+                <p className="font-extrabold text-gray-850 dark:text-gray-200">Manual Transcript Uploads</p>
+              </div>
+              <p className="text-xs text-gray-500 pl-7 leading-relaxed font-medium">
+                For custom platforms or one-off recordings:
+              </p>
+              <div className="pl-7 space-y-1.5 text-xs text-gray-500 font-semibold">
+                <p>• Export your meeting transcript as a <code className="bg-gray-200 dark:bg-white/5 px-1 py-0.5 rounded text-[10px]">.vtt</code> or <code className="bg-gray-200 dark:bg-white/5 px-1 py-0.5 rounded text-[10px]">.txt</code> file.</p>
+                <p>• Press the <strong className="text-indigo-650 dark:text-indigo-400">New Meeting Post</strong> button, enter title, and drag your file.</p>
+                <p>• Click "Process Transcript" to let Gemini AI extract deliverables instantly.</p>
+              </div>
+            </div>
           </div>
-        ) : meetings.length > 0 ? (
-          meetings.map((meeting) => (
-            <div
-              key={meeting.id}
-              className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm"
+
+          <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200/50 dark:border-violet-900/30 rounded-xl p-4 flex gap-3 text-xs text-violet-850 dark:text-violet-300 font-medium">
+            <AlertCircle className="flex-shrink-0 text-violet-600 dark:text-violet-400" size={16} />
+            <p className="leading-relaxed">
+              <strong>Tip:</strong> Meeting transcript analysis uses the high-performance Gemini 1.5 Pro model to accurately capture tasks, reassignments, and executive decisions.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Side: Main Content */}
+        <div className="space-y-6 w-full">
+          {isUploading && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-xl"
             >
-              <div
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                onClick={() => setExpandedId(expandedId === meeting.id ? null : meeting.id)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-lg ${
-                    meeting.platform === 'zoom' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
-                    meeting.platform === 'google_meet' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
-                    meeting.platform === 'fathom' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' :
-                    'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                  }`}>
-                    <Video size={20} />
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100">Upload Meeting Transcript</h3>
+                <button onClick={() => setIsUploading(false)} className="text-gray-400 hover:text-gray-650 cursor-pointer bg-transparent border-0 outline-none p-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-all flex items-center justify-center">
+                  <Plus className="rotate-45" size={16} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleUpload} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Meeting Title</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Q3 Planning Meeting"
+                      className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-gray-800 dark:text-gray-250 font-semibold"
+                      value={uploadData.title}
+                      onChange={e => setUploadData({...uploadData, title: e.target.value})}
+                    />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100">{meeting.title}</h3>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(meeting.meeting_date).toLocaleDateString()}</span>
-                      <span className="uppercase font-bold">{meeting.platform.replace('_', ' ')}</span>
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Platform</label>
+                    <select
+                      className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none text-gray-850 dark:text-gray-250 font-semibold cursor-pointer"
+                      value={uploadData.platform}
+                      onChange={e => setUploadData({...uploadData, platform: e.target.value})}
+                    >
+                      <option value="manual">Manual Upload</option>
+                      <option value="zoom">Zoom</option>
+                      <option value="google_meet">Google Meet</option>
+                      <option value="teams">MS Teams</option>
+                      <option value="fathom">Fathom</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none text-gray-850 dark:text-gray-250 font-semibold cursor-pointer"
+                      value={uploadData.date}
+                      onChange={e => setUploadData({...uploadData, date: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Participants</label>
+                    <input
+                      type="text"
+                      placeholder="John, Priya, Rahul"
+                      className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm outline-none text-gray-850 dark:text-gray-250 font-semibold"
+                      value={uploadData.participants}
+                      onChange={e => setUploadData({...uploadData, participants: e.target.value})}
+                    />
                   </div>
                 </div>
-                {expandedId === meeting.id ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
-              </div>
-
-              {expandedId === meeting.id && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  className="px-4 pb-4 border-t border-gray-100 dark:border-white/5"
-                >
-                  <div className="py-4 space-y-4">
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Summary</h4>
-                      <div className="mb-3">
-                        {formatMarkdown(meeting.summary)}
-                      </div>
-                      {meeting.transcript_url && (
-                        <div className="pt-1">
-                          <a
-                            href={meeting.transcript_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-950/30 border-violet-200 dark:border-violet-900/50 text-violet-700 dark:text-violet-400 transition-colors shadow-sm cursor-pointer"
-                          >
-                            <Video size={12} className="text-violet-500" />
-                            View Fathom Recording
-                          </a>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Key Topics</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {meeting.key_topics?.map((topic, i) => (
-                            <span key={i} className="bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 px-2 py-1 rounded text-xs font-medium">
-                              {topic}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Decisions</h4>
-                        <ul className="space-y-2">
-                          {meeting.decisions?.map((d: any, i: number) => (
-                            <li key={i} className="text-sm text-gray-600 dark:text-gray-300 flex items-start gap-2">
-                              <CheckCircle2 size={14} className="text-green-500 mt-0.5 flex-shrink-0" />
-                              <span>{d.decision}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Transcript File (.vtt, .txt)</label>
+                  <div className="border-2 border-dashed border-gray-250 dark:border-white/5 rounded-xl p-8 text-center hover:border-indigo-500 transition-colors cursor-pointer relative">
+                    <input
+                      type="file"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={e => setUploadData({...uploadData, transcript: e.target.files?.[0] || null})}
+                    />
+                    <Upload className="mx-auto text-gray-400 mb-2" size={32} />
+                    <p className="text-sm text-gray-600 dark:text-gray-400 font-semibold">
+                      {uploadData.transcript ? uploadData.transcript.name : "Click to select or drag and drop"}
+                    </p>
                   </div>
-                </motion.div>
-              )}
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-            <FileText className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={48} />
-            <p className="text-gray-500 dark:text-gray-400">No meetings processed yet.</p>
-            <p className="text-sm text-gray-400 dark:text-gray-500">Upload your first transcript to generate tasks.</p>
+                </div>
+
+                <button
+                  disabled={isProcessing}
+                  className="w-full bg-indigo-650 hover:bg-indigo-750 disabled:bg-indigo-400 text-white font-extrabold py-3 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] border-none shadow-sm"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Processing with Gemini AI...
+                    </>
+                  ) : (
+                    <>Process Transcript</>
+                  )}
+                </button>
+              </form>
+            </motion.div>
+          )}
+
+          {/* Meetings List */}
+          <div className="space-y-4">
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="animate-spin text-indigo-500" />
+              </div>
+            ) : meetings.length > 0 ? (
+              meetings.map((meeting) => (
+                <div
+                  key={meeting.id}
+                  className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm"
+                >
+                  <div
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    onClick={() => setExpandedId(expandedId === meeting.id ? null : meeting.id)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-lg ${
+                        meeting.platform === 'zoom' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                        meeting.platform === 'google_meet' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                        meeting.platform === 'fathom' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' :
+                        'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                      }`}>
+                        <Video size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-800 dark:text-gray-100">{meeting.title}</h3>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span className="flex items-center gap-1 font-semibold"><Calendar size={12} /> {new Date(meeting.meeting_date).toLocaleDateString()}</span>
+                          <span className="uppercase font-bold">{meeting.platform.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {expandedId === meeting.id ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
+                  </div>
+
+                  {expandedId === meeting.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      className="px-4 pb-4 border-t border-gray-100 dark:border-white/5"
+                    >
+                      <div className="py-4 space-y-4">
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Summary</h4>
+                          <div className="mb-3">
+                            {formatMarkdown(meeting.summary)}
+                          </div>
+                          {meeting.transcript_url && (
+                            <div className="pt-1">
+                              <a
+                                href={meeting.transcript_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border bg-violet-50 hover:bg-violet-105 dark:bg-violet-950/20 dark:hover:bg-violet-950/30 border-violet-200 dark:border-violet-900/50 text-violet-700 dark:text-violet-400 transition-colors shadow-sm cursor-pointer"
+                              >
+                                <Video size={12} className="text-violet-500" />
+                                View Fathom Recording
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Key Topics</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {meeting.key_topics?.map((topic, i) => (
+                                <span key={i} className="bg-gray-105 dark:bg-white/5 text-gray-600 dark:text-gray-400 px-2 py-1 rounded text-xs font-bold">
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Decisions</h4>
+                            <ul className="space-y-2">
+                              {meeting.decisions?.map((d: any, i: number) => (
+                                <li key={i} className="text-sm text-gray-600 dark:text-gray-300 flex items-start gap-2 font-medium">
+                                  <CheckCircle2 size={14} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                  <span>{d.decision}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
+                <FileText className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={48} />
+                <p className="text-gray-500 dark:text-gray-400 font-semibold">No meetings processed yet.</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 font-medium">Upload your first transcript to generate tasks.</p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
