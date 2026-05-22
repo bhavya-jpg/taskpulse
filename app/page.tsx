@@ -2286,6 +2286,15 @@ function EmployeeDashboard({
   );
 }
 
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "dashboard", label: "Dashboard",     icon: <BarChart2 size={15} /> },
+  { id: "meetings",  label: "Meetings",      icon: <Video size={15} /> },
+  { id: "client",    label: "By Client",     icon: <Briefcase size={15} /> },
+  { id: "employee",  label: "By Employee",   icon: <Users size={15} /> },
+  { id: "slack",     label: "Slack Connect", icon: <Hash size={15} /> },
+  { id: "email",     label: "Email",    icon: <Mail size={15} /> },
+];
+
 export default function TaskPulse() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -2811,14 +2820,14 @@ export default function TaskPulse() {
               <SlackSetup 
                 onToast={addToast} 
                 loadTasks={loadTasks} 
-                setActiveTab={setActiveTab} 
+                setActiveTab={(tab: any) => setActiveTab(tab)} 
               />
             )}
             {activeTab === "email" && (
               <EmailView 
                 onToast={addToast} 
                 loadTasks={loadTasks} 
-                setActiveTab={setActiveTab} 
+                setActiveTab={(tab: any) => setActiveTab(tab)} 
                 tasks={tasks}
               />
             )}
