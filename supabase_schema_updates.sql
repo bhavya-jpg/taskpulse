@@ -53,3 +53,17 @@ ALTER TABLE meetings ADD COLUMN IF NOT EXISTS company text;
 ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE emails DISABLE ROW LEVEL SECURITY;
 ALTER TABLE slack_messages DISABLE ROW LEVEL SECURITY;
+
+-- ─── 6. CLIENTS TABLE ────────────────────────────────────────────────────────
+-- Stores whitelisted clients registered manually by the founder.
+CREATE TABLE IF NOT EXISTS clients (
+  id           text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  company      text NOT NULL,
+  name         text NOT NULL,
+  created_at   timestamptz DEFAULT now(),
+  UNIQUE (company, name)
+);
+
+-- Disable RLS on the clients table for collaborative testing simplicity
+ALTER TABLE clients DISABLE ROW LEVEL SECURITY;
+

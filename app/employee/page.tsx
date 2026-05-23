@@ -61,11 +61,32 @@ type Tab = "dashboard" | "client" | "slack" | "email" | "meetings";
 const EMPLOYEES = ["Rahul", "Priya", "Admin", "Vikas"];
 const CLIENTS = ["Flipkart", "Zomato", "Amazon", "Google"];
 
-const CLIENT_COLORS: Record<string, { bg: string; text: string; border: string; header: string }> = {
-  Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
-  Zomato:   { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
-  Amazon:   { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
-  Google:   { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+const getClientColors = (client: string) => {
+  const predefined: Record<string, { bg: string; text: string; border: string; header: string }> = {
+    Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+    Zomato: { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
+    Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
+    Google: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+  };
+
+  if (client && predefined[client]) return predefined[client];
+
+  // Dynamic colors based on string hashing
+  const palettes = [
+    { bg: "bg-indigo-50/80 dark:bg-indigo-500/10", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-200/60 dark:border-indigo-500/20", header: "bg-indigo-650 dark:bg-indigo-850" },
+    { bg: "bg-rose-50/80 dark:bg-rose-500/10", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200/60 dark:border-rose-500/20", header: "bg-rose-650 dark:bg-rose-850" },
+    { bg: "bg-emerald-50/80 dark:bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200/60 dark:border-emerald-500/20", header: "bg-emerald-650 dark:bg-emerald-850" },
+    { bg: "bg-violet-50/80 dark:bg-violet-500/10", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200/60 dark:border-violet-500/20", header: "bg-violet-650 dark:bg-violet-850" },
+    { bg: "bg-sky-50/80 dark:bg-sky-500/10", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200/60 dark:border-sky-500/20", header: "bg-sky-600 dark:bg-sky-800" },
+  ];
+
+  const str = client || "General";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % palettes.length;
+  return palettes[index];
 };
 
 const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; bg: string; border: string }> = {
@@ -130,7 +151,7 @@ function TaskCard({
   const [showBlockerModal, setShowBlockerModal] = useState(false);
   const [tempNote, setTempNote] = useState(task.blockerNote || "");
   const pc = PRIORITY_CONFIG[task.priority];
-  const cc = CLIENT_COLORS[task.client] || { bg: "bg-slate-100 dark:bg-slate-700/30", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/50" };
+  const cc = getClientColors(task.client);
   const overdue = isOverdue(task.deadline) && task.status !== "done";
 
   return (
@@ -509,6 +530,35 @@ function ClientView({
   onToggleBlocker: (id: number | string, isBlocked: boolean, note?: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      setLoadingClients(true);
+      try {
+        const res = await fetch("/api/clients");
+        const data = await res.json();
+        if (data.clients) {
+          setClients(data.clients);
+        }
+      } catch (err) {
+        console.error("Failed to fetch clients on employee console:", err);
+      } finally {
+        setLoadingClients(false);
+      }
+    };
+    fetchClients();
+  }, []);
+
+  // Combine manually whitelisted database clients and historically extracted client names to remain 100% robust and safe
+  const registeredNames = clients.map((c) => c.name);
+  const dynamicClients = Array.from(
+    new Set([
+      ...registeredNames,
+      ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")
+    ])
+  ).sort();
 
   const empTasks = tasks.filter((t) => t.assignedTo.toLowerCase() === empName.toLowerCase());
   const pending = empTasks.filter((t) => t.status === "pending");
@@ -532,10 +582,10 @@ function ClientView({
       </div>
 
       <div className="flex flex-col gap-4">
-        {CLIENTS.map((client) => {
+        {dynamicClients.map((client) => {
           const clientTasks = empTasks.filter((t) => t.client === client);
           const clientDone = clientTasks.filter((t) => t.status === "done").length;
-          const cc = CLIENT_COLORS[client];
+          const cc = getClientColors(client);
           const open = !collapsed[client];
 
           return (

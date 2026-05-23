@@ -33,6 +33,10 @@ import {
   Sparkles,
   Loader2,
   Undo,
+  Plus,
+  Trash,
+  FolderPlus,
+  AlertCircle,
 } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
@@ -84,11 +88,32 @@ const INITIAL_TASKS: Task[] = [
 const CLIENTS = ["Flipkart", "Zomato", "Amazon", "Google"];
 const EMPLOYEES = ["Rahul", "Priya", "Admin", "Vikas"];
 
-const CLIENT_COLORS: Record<string, { bg: string; text: string; border: string; header: string }> = {
-  Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
-  Zomato: { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
-  Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
-  Google: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+const getClientColors = (client: string) => {
+  const predefined: Record<string, { bg: string; text: string; border: string; header: string }> = {
+    Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+    Zomato: { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
+    Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
+    Google: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+  };
+
+  if (client && predefined[client]) return predefined[client];
+
+  // Dynamic colors based on string hashing
+  const palettes = [
+    { bg: "bg-indigo-50/80 dark:bg-indigo-500/10", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-200/60 dark:border-indigo-500/20", header: "bg-indigo-650 dark:bg-indigo-850" },
+    { bg: "bg-rose-50/80 dark:bg-rose-500/10", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200/60 dark:border-rose-500/20", header: "bg-rose-650 dark:bg-rose-850" },
+    { bg: "bg-emerald-50/80 dark:bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200/60 dark:border-emerald-500/20", header: "bg-emerald-650 dark:bg-emerald-850" },
+    { bg: "bg-violet-50/80 dark:bg-violet-500/10", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200/60 dark:border-violet-500/20", header: "bg-violet-650 dark:bg-violet-850" },
+    { bg: "bg-sky-50/80 dark:bg-sky-500/10", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200/60 dark:border-sky-500/20", header: "bg-sky-600 dark:bg-sky-800" },
+  ];
+
+  const str = client || "General";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % palettes.length;
+  return palettes[index];
 };
 
 const PRIORITY_CONFIG: Record<Priority, { dot: string; text: string; bg: string; border: string }> = {
@@ -171,7 +196,7 @@ function TaskCard({
   const [showBlockerModal, setShowBlockerModal] = useState(false);
   const [tempNote, setTempNote] = useState(task.blockerNote || "");
   const pc = PRIORITY_CONFIG[task.priority];
-  const cc = CLIENT_COLORS[task.client] || { bg: "bg-slate-100 dark:bg-slate-700/30", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/50" };
+  const cc = getClientColors(task.client);
   const overdue = isOverdue(task.deadline) && task.status !== "done";
 
   const [isEditing, setIsEditing] = useState(false);
@@ -226,7 +251,7 @@ function TaskCard({
               onChange={(e) => setEditClient(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer"
             >
-              {CLIENTS.map((c) => (
+              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client])).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -591,6 +616,7 @@ function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: 
 
 function ManualTaskCreator({
   onAddTask,
+  tasks,
 }: {
   onAddTask: (task: {
     title: string;
@@ -599,14 +625,26 @@ function ManualTaskCreator({
     deadline: string;
     priority: Priority;
   }) => Promise<void>;
+  tasks: Task[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [client, setClient] = useState(CLIENTS[0]);
+
+  const dynamicClients = Array.from(
+    new Set(["Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")])
+  );
+
+  const [client, setClient] = useState(dynamicClients[0]);
   const [assignedTo, setAssignedTo] = useState(EMPLOYEES[0]);
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!dynamicClients.includes(client)) {
+      setClient(dynamicClients[0]);
+    }
+  }, [tasks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -669,7 +707,7 @@ function ManualTaskCreator({
                   onChange={(e) => setClient(e.target.value)}
                   className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-semibold"
                 >
-                  {CLIENTS.map((c) => (
+                  {dynamicClients.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
@@ -852,7 +890,7 @@ function DashboardView({
         </motion.div>
       )}
 
-      <ManualTaskCreator onAddTask={onAddTask} />
+      <ManualTaskCreator onAddTask={onAddTask} tasks={tasks} />
 
       <div className="flex justify-between items-center bg-white dark:bg-[#15171b] p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/70 dark:bg-slate-700/30 rounded-xl border border-slate-200/60 dark:border-slate-600/50">
@@ -982,6 +1020,88 @@ function ClientView({
   onMarkActive?: (id: number | string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [newClientName, setNewClientName] = useState("");
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [addingClient, setAddingClient] = useState(false);
+  const [schemaNotInitialized, setSchemaNotInitialized] = useState(false);
+
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const res = await fetch("/api/clients");
+      const data = await res.json();
+      if (data.schemaNotInitialized) {
+        setSchemaNotInitialized(true);
+      } else {
+        setSchemaNotInitialized(false);
+      }
+      if (data.clients) {
+        setClients(data.clients);
+      }
+    } catch (err) {
+      console.error("Failed to fetch clients:", err);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const handleAddClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClientName.trim()) return;
+    setAddingClient(true);
+    try {
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newClientName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewClientName("");
+        await fetchClients();
+      } else if (data.schemaNotInitialized) {
+        setSchemaNotInitialized(true);
+        alert(data.error || "Schema not initialized");
+      } else {
+        alert(data.error || "Failed to add client");
+      }
+    } catch (err) {
+      console.error("Failed to add client:", err);
+    } finally {
+      setAddingClient(false);
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this client? Tasks already parsed will remain, but this brand won't be whitelisted for scanning anymore.")) return;
+    try {
+      const res = await fetch(`/api/clients?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchClients();
+      } else {
+        alert(data.error || "Failed to delete client");
+      }
+    } catch (err) {
+      console.error("Failed to delete client:", err);
+    }
+  };
+
+  // Combine manually whitelisted database clients and historically extracted client names to remain 100% robust and safe
+  const registeredNames = clients.map((c) => c.name);
+  const dynamicClients = Array.from(
+    new Set([
+      ...registeredNames,
+      ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")
+    ])
+  ).sort();
 
   const total = tasks.length;
   const highPriority = tasks.filter((t) => t.priority === "High").length;
@@ -990,9 +1110,90 @@ function ClientView({
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Tasks by Client</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.filter((t) => t.status === "pending").length} pending tasks across all clients</p>
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Tasks by Client</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.filter((t) => t.status === "pending").length} pending tasks across all clients</p>
+        </div>
+      </div>
+
+      {/* Premium Glassmorphic Client Registry Manager */}
+      <div className="bg-white/80 dark:bg-[#1c1e22]/80 backdrop-blur-md rounded-2xl p-5 border border-slate-200/60 dark:border-slate-800/80 shadow-sm mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <FolderPlus size={18} className="text-teal-600 dark:text-teal-400" />
+              Client Registry
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Manually register active brands to instruct the AI scanners (Gmail & Slack) to perfectly filter tasks for these clients.
+            </p>
+          </div>
+          
+          <form onSubmit={handleAddClient} className="flex items-center gap-2 w-full md:w-auto">
+            <input
+              type="text"
+              placeholder="e.g. Rapido, HDFC, Zomato"
+              value={newClientName}
+              onChange={(e) => setNewClientName(e.target.value)}
+              disabled={addingClient}
+              className="px-3.5 py-2 bg-slate-50 dark:bg-[#121316] text-sm text-slate-850 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 flex-1 md:w-56"
+            />
+            <button
+              type="submit"
+              disabled={addingClient || !newClientName.trim()}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+            >
+              {addingClient ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Add Brand
+            </button>
+          </form>
+        </div>
+
+        {schemaNotInitialized ? (
+          <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200/50 dark:border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold block mb-0.5">Supabase Table Migration Required</span>
+              Please run the SQL schema updates in your Supabase Dashboard SQL Editor to initialize the <code>clients</code> table. 
+              Until run, dynamic registry and whitelisting will run in compatibility fallback mode.
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2.5 mt-2">
+            {loadingClients ? (
+              <div className="flex items-center gap-1.5 py-1.5 px-3 text-xs text-slate-400 font-medium">
+                <Loader2 size={12} className="animate-spin" /> Loading clients...
+              </div>
+            ) : clients.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1.5 px-1">
+                No custom clients registered yet. The AI is running in general parsing mode (Flipkart, Zomato, etc. supported).
+              </p>
+            ) : (
+              clients.map((c) => {
+                const colors = getClientColors(c.name);
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-2 py-1.5 pl-3 pr-2 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 rounded-full transition-all text-xs font-semibold text-slate-700 dark:text-slate-350 shadow-sm"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${colors.header.replace("bg-gradient-to-r from-", "bg-").split(" ")[0]}`} />
+                      {c.name}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteClient(c.id)}
+                      className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700/50 border-0 cursor-pointer outline-none transition-all"
+                      title={`Remove ${c.name}`}
+                    >
+                      <Trash size={12} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1003,10 +1204,10 @@ function ClientView({
       </div>
 
       <div className="flex flex-col gap-4">
-        {CLIENTS.map((client) => {
+        {dynamicClients.map((client) => {
           const clientTasks = tasks.filter((t) => t.client === client);
           const clientDone = clientTasks.filter((t) => t.status === "done").length;
-          const cc = CLIENT_COLORS[client];
+          const cc = getClientColors(client);
           const open = !collapsed[client];
 
           return (
@@ -1147,11 +1348,23 @@ function EmailView({
   loadTasks,
   setActiveTab,
   tasks,
+  emails,
+  setEmails,
+  loading,
+  setLoading,
+  selectedId,
+  setSelectedId,
 }: {
   onToast: (msg: string) => void;
   loadTasks: () => Promise<void>;
   setActiveTab: (tab: Tab) => void;
   tasks: Task[];
+  emails: any[];
+  setEmails: React.Dispatch<React.SetStateAction<any[]>>;
+  loading: boolean;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedId: string | null;
+  setSelectedId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
   interface GmailEmail {
     id: string;
@@ -1163,10 +1376,7 @@ function EmailView({
     isUnread: boolean;
   }
 
-  const [emails, setEmails] = useState<GmailEmail[]>([]);
-  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
 
   const getAvatarStyle = (name: string) => {
@@ -1183,6 +1393,30 @@ function EmailView({
     return colors[index];
   };
 
+  const fetchRawEmails = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetch("/api/gmail/inbox", { priority: "low" } as any);
+      if (res.status === 401) {
+        disconnectGmail();
+        if (!silent) setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.emails) {
+        setEmails(data.emails);
+        if (data.emails.length > 0 && !selectedId) {
+          setSelectedId(data.emails[0].id);
+        }
+      } else if (data.error) {
+        if (!silent) onToast(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      if (!silent) onToast("Failed to fetch emails.");
+    }
+    if (!silent) setLoading(false);
+  };
+
   useEffect(() => {
     const emailCookie = document.cookie
       .split("; ")
@@ -1191,7 +1425,11 @@ function EmailView({
       const email = decodeURIComponent(emailCookie.split("=")[1]);
       if (email) {
         setConnectedEmail(email);
-        fetchRawEmails();
+        if (emails.length === 0) {
+          fetchRawEmails(false);
+        } else {
+          fetchRawEmails(true);
+        }
       }
     }
   }, []);
@@ -1204,30 +1442,6 @@ function EmailView({
     setEmails([]);
     setSelectedId(null);
     onToast("Gmail disconnected.");
-  };
-
-  const fetchRawEmails = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/gmail/inbox");
-      if (res.status === 401) {
-        disconnectGmail();
-        setLoading(false);
-        return;
-      }
-      const data = await res.json();
-      if (data.emails) {
-        setEmails(data.emails);
-        if (data.emails.length > 0 && !selectedId) {
-          setSelectedId(data.emails[0].id);
-        }
-      } else if (data.error) {
-        onToast(`Error: ${data.error}`);
-      }
-    } catch (e) {
-      onToast("Failed to fetch emails.");
-    }
-    setLoading(false);
   };
 
   const syncAndAnalyzeWithAI = async () => {
@@ -1614,9 +1828,20 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
 }) {
   const [input, setInput] = useState("");
   const [source, setSource] = useState("slack");
-  const [client, setClient] = useState("Flipkart");
+
+  const dynamicClients = Array.from(
+    new Set(["Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")])
+  );
+
+  const [client, setClient] = useState(dynamicClients[0]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (!dynamicClients.includes(client)) {
+      setClient(dynamicClients[0]);
+    }
+  }, [tasks]);
 
   const extract = () => {
     if (!input.trim()) return;
@@ -1691,7 +1916,7 @@ function DemoModePanel({ tasks, setTasks, onToast }: {
             onChange={(e) => setClient(e.target.value)}
             className="border border-amber-200/70 dark:border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-[#15171b] focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-600"
           >
-            {CLIENTS.map((c) => <option key={c} value={c}>{c}</option>)}
+            {dynamicClients.map((c) => <option key={c} value={c}>{c}</option>)}
             <option value="Unknown">Unknown</option>
           </select>
           <button
@@ -2063,6 +2288,9 @@ export default function FounderPage() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [emailSelectedId, setEmailSelectedId] = useState<string | null>(null);
 
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [onboardingData, setOnboardingData] = useState<{
@@ -2564,6 +2792,12 @@ export default function FounderPage() {
                 loadTasks={loadTasks}
                 setActiveTab={setActiveTab}
                 tasks={tasks}
+                emails={emails}
+                setEmails={setEmails}
+                loading={loadingEmails}
+                setLoading={setLoadingEmails}
+                selectedId={emailSelectedId}
+                setSelectedId={setEmailSelectedId}
               />
             )}
           </motion.div>

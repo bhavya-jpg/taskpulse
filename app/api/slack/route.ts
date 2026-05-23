@@ -111,6 +111,15 @@ function hasTaskKeywords(text: string): boolean {
     "presentation", "slides", "spreadsheet", "sheet", "dashboard", "sync", "alignment",
     "huddle", "discuss", "forward", "attach", "run", "execute", "start", "begin",
     
+    // Supported Clients & Brand Names
+    "flipkart", "zomato", "amazon", "google", "client", "customer",
+
+    // Transaction & Inquiry Terms
+    "order", "orders", "ordered", "ask", "asking", "inquiry", "inquiries", 
+    "enquiry", "enquiries", "request", "requests", "requested", "query", "queries", 
+    "question", "questions", "help", "support", "assist", "assistance", "pricing", 
+    "quote", "quotation", "delivery", "shipping", "shipped",
+
     // Hinglish Action & Task Keywords (Massive Quota Saver)
     "bhai", "yaar", "kal tak", "aaj tak", "shaam tak", "parso tak", "jaldi", 
     "urgent hai", "turant", "bhej", "bhejo", "bhej dena", "mail kar", "mail kardo",
@@ -140,6 +149,22 @@ export async function GET() {
     .eq("id", userId)
     .single();
   const company = profile?.company || null;
+
+  // Fetch registered whitelisted clients for this company
+  let registeredClients: string[] = []
+  if (company) {
+    try {
+      const { data: clientsData } = await supabaseAdmin
+        .from("clients")
+        .select("name")
+        .eq("company", company);
+      if (clientsData && Array.isArray(clientsData)) {
+        registeredClients = clientsData.map(c => c.name.trim());
+      }
+    } catch (err) {
+      console.warn("[Slack Scan] Failed to fetch registered clients (table might not exist yet):", err);
+    }
+  }
 
   const cookieStore = await cookies();
   const token = cookieStore.get("slack_token")?.value;
@@ -198,10 +223,23 @@ export async function GET() {
       `Message ${i + 1}:\nFrom: ${m.sender}\nText: ${m.text}`
     ).join("\n---\n");
 
+    let clientMatchingInstructions = "";
+    if (registeredClients.length > 0) {
+      clientMatchingInstructions = `
+CRITICAL: The creative agency works ONLY with this list of registered clients: [${registeredClients.join(", ")}].
+For each task, analyze the content and identify if it belongs to one of these registered clients. If it matches, classify it exactly as one of the registered clients: [${registeredClients.join(", ")}].
+If the task is from a message that does NOT match any of these registered clients, assign the 'client' field to "General". DO NOT make up other client names.`;
+    } else {
+      clientMatchingInstructions = `
+Identify the company or client name associated with this task (e.g., Zomato, Flipkart, Amazon, Google, or Unknown). If it doesn't match any obvious brand, output "General" or "Unknown".`;
+    }
+
     let text = "";
     try {
       const prompt = `You are an elite task extraction AI. Analyze these Slack team messages and extract actionable tasks assigned to team members.
+${clientMatchingInstructions}
 
+Here are the messages to analyze:
 ${messageList}
 
 Respond ONLY with the requested JSON array representing tasks found.`;
@@ -239,13 +277,29 @@ Respond ONLY with the requested JSON array representing tasks found.`;
             const originalMsg = actionableMessages[task.message_index - 1];
             if (!originalMsg) continue;
 
-            // Map client
+            // Standardize client name to match registered whitelisted clients dynamically
             let matchedClient = "General";
-            const clientInput = String(task.client).toLowerCase();
-            if (clientInput.includes("flipkart")) matchedClient = "Flipkart";
-            else if (clientInput.includes("zomato")) matchedClient = "Zomato";
-            else if (clientInput.includes("amazon")) matchedClient = "Amazon";
-            else if (clientInput.includes("google")) matchedClient = "Google";
+            const clientInput = String(task.client).trim();
+            if (clientInput && clientInput.toLowerCase() !== "unknown" && clientInput.toLowerCase() !== "general") {
+              const lowerInput = clientInput.toLowerCase();
+              // Check if there's a match in registered clients list
+              const matchedRegistered = registeredClients.find(rc => rc.toLowerCase() === lowerInput);
+              if (matchedRegistered) {
+                matchedClient = matchedRegistered;
+              } else if (registeredClients.length === 0) {
+                // Heuristic fallback if no registered clients are set yet (V0 compatibility)
+                if (lowerInput.includes("flipkart")) matchedClient = "Flipkart";
+                else if (lowerInput.includes("zomato")) matchedClient = "Zomato";
+                else if (lowerInput.includes("amazon")) matchedClient = "Amazon";
+                else if (lowerInput.includes("google")) matchedClient = "Google";
+                else {
+                  matchedClient = clientInput.charAt(0).toUpperCase() + clientInput.slice(1);
+                }
+              } else {
+                // If we have whitelisted clients and it didn't match, map to "General" to avoid spam tasks
+                matchedClient = "General";
+              }
+            }
 
             // Save to database with deduplication using Slack message ts
             try {
