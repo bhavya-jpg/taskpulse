@@ -24,6 +24,16 @@ import {
   Moon,
   Hash,
   ArrowLeft,
+  Sparkles,
+  RefreshCw,
+  Crown,
+  ShieldCheck,
+  Undo,
+  Edit2,
+  Plus,
+  Trash,
+  FolderPlus,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
@@ -141,11 +151,31 @@ function ToastContainer({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: nu
 function TaskCard({
   task,
   onMarkDone,
+  onConfirm,
+  onDismiss,
+  onReassign,
   onToggleBlocker,
+  onSendToReview,
+  onUpdateTask,
+  onMarkActive,
+  showConfirmButtons = false,
+  showFrom = false,
+  isFounder = false,
+  employeesList,
 }: {
   task: Task;
   onMarkDone?: (id: number | string) => void;
+  onConfirm?: (id: number | string) => void;
+  onDismiss?: (id: number | string) => void;
+  onReassign?: (id: number | string, newAssignee: string) => void;
   onToggleBlocker?: (id: number | string, isBlocked: boolean, note?: string) => void;
+  onSendToReview?: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  onMarkActive?: (id: number | string) => void;
+  showConfirmButtons?: boolean;
+  showFrom?: boolean;
+  isFounder?: boolean;
+  employeesList?: string[];
 }) {
   const [showSource, setShowSource] = useState(false);
   const [showBlockerModal, setShowBlockerModal] = useState(false);
@@ -153,6 +183,141 @@ function TaskCard({
   const pc = PRIORITY_CONFIG[task.priority];
   const cc = getClientColors(task.client);
   const overdue = isOverdue(task.deadline) && task.status !== "done";
+
+  const activeEmployees = employeesList || EMPLOYEES;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editClient, setEditClient] = useState(task.client);
+  const [editPriority, setEditPriority] = useState<Priority>(task.priority);
+  const [editAssignee, setEditAssignee] = useState(task.assignedTo);
+  const [editDeadline, setEditDeadline] = useState(task.deadline);
+
+  useEffect(() => {
+    setEditTitle(task.title);
+    setEditClient(task.client);
+    setEditPriority(task.priority);
+    setEditAssignee(task.assignedTo);
+    setEditDeadline(task.deadline);
+  }, [task]);
+
+  if (isEditing) {
+    return (
+      <motion.div
+        layout
+        className="bg-white dark:bg-[#15171b] rounded-2xl shadow-sm border border-teal-500/20 p-4 flex flex-col gap-3.5"
+      >
+        <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-700/60 pb-2">
+          <span className="text-xs font-semibold text-teal-600 dark:text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Edit2 size={12} className="text-teal-500" /> Edit Deliverable
+          </span>
+          <button
+            onClick={() => setIsEditing(false)}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700/40 rounded-md cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Task Title</label>
+          <input
+            type="text"
+            required
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none focus:ring-1 focus:ring-teal-500"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Client</label>
+            <select
+              value={editClient}
+              onChange={(e) => setEditClient(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer"
+            >
+              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client])).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Priority</label>
+            <select
+              value={editPriority}
+              onChange={(e) => setEditPriority(e.target.value as Priority)}
+              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer"
+            >
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Assignee</label>
+            <select
+              value={editAssignee}
+              disabled={!isFounder}
+              onChange={(e) => setEditAssignee(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer disabled:opacity-80"
+            >
+              {activeEmployees.map((emp) => (
+                <option key={emp} value={emp}>{emp}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline</label>
+            <input
+              type="date"
+              required
+              value={editDeadline}
+              onChange={(e) => setEditDeadline(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 mt-1.5">
+          <button
+            onClick={async () => {
+              if (editTitle.trim()) {
+                await onUpdateTask?.(task.id, {
+                  title: editTitle.trim(),
+                  client: editClient,
+                  priority: editPriority,
+                  assignedTo: editAssignee,
+                  deadline: editDeadline,
+                });
+                setIsEditing(false);
+              }
+            }}
+            className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+          >
+            <CheckCircle2 size={13} /> Save
+          </button>
+          <button
+            onClick={() => {
+              setEditTitle(task.title);
+              setEditClient(task.client);
+              setEditPriority(task.priority);
+              setEditAssignee(task.assignedTo);
+              setEditDeadline(task.deadline);
+              setIsEditing(false);
+            }}
+            className="flex-1 bg-white dark:bg-[#15171b] hover:bg-slate-100 dark:hover:bg-slate-700/40 text-slate-600 dark:text-slate-300 text-[11px] font-semibold rounded-lg py-2 transition-all border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+          >
+            <X size={13} /> Cancel
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -173,38 +338,50 @@ function TaskCard({
               {task.priority}
             </span>
           </div>
-          
-          {task.source === "slack" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <MessageCircle size={10} className="rotate-90 text-teal-500" />
-              Slack
-            </span>
-          ) : task.source === "email" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <Mail size={10} className="text-teal-500" />
-              Gmail
-            </span>
-          ) : task.source === "fathom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <Video size={10} className="text-teal-500" />
-              Fathom
-            </span>
-          ) : task.source === "zoom" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <Video size={10} className="text-teal-500" />
-              Zoom
-            </span>
-          ) : task.source === "google_meet" ? (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <Video size={10} className="text-teal-500" />
-              Google Meet
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
-              <Inbox size={10} className="text-teal-500" />
-              Feed
-            </span>
-          )}
+
+          <div className="flex items-center gap-1.5">
+            {task.source === "slack" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <MessageCircle size={10} className="rotate-90 text-teal-500" />
+                Slack
+              </span>
+            ) : task.source === "email" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <Mail size={10} className="text-teal-500" />
+                Gmail
+              </span>
+            ) : task.source === "fathom" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <Video size={10} className="text-teal-500" />
+                Fathom
+              </span>
+            ) : task.source === "zoom" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <Video size={10} className="text-teal-500" />
+                Zoom
+              </span>
+            ) : task.source === "google_meet" ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <Video size={10} className="text-teal-500" />
+                Google Meet
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-md border bg-slate-100/70 dark:bg-slate-700/30 border-slate-200/60 dark:border-slate-600/50 text-slate-700 dark:text-slate-200">
+                <Inbox size={10} className="text-teal-500" />
+                Feed
+              </span>
+            )}
+
+            {onUpdateTask && (
+              <button
+                onClick={() => setIsEditing(true)}
+                title="Edit Deliverable"
+                className="text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 p-1 hover:bg-teal-50 dark:hover:bg-teal-500/10 rounded-md transition-colors cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
+              >
+                <Edit2 size={11} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -228,7 +405,19 @@ function TaskCard({
             <div className="w-5 h-5 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center border border-teal-200/60 dark:border-teal-500/20">
               <User size={10} className="text-teal-600 dark:text-teal-300" />
             </div>
-            <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
+            {isFounder && onReassign ? (
+              <select
+                value={task.assignedTo}
+                onChange={(e) => onReassign?.(task.id, e.target.value)}
+                className="bg-teal-50/80 dark:bg-[#121316] border border-teal-200/60 dark:border-teal-500/20 rounded-lg px-2 py-0.5 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold cursor-pointer transition-colors"
+              >
+                {activeEmployees.map((emp) => (
+                  <option key={emp} value={emp}>{emp}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <Calendar size={11} className={overdue ? "text-amber-600 dark:text-amber-400" : "text-slate-400"} />
@@ -243,6 +432,13 @@ function TaskCard({
             Source: {task.sourceGroup}
           </span>
         </div>
+
+        {showConfirmButtons && (
+          <div className="bg-amber-50/60 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 rounded-lg px-2.5 py-2 text-[10px] text-amber-900 dark:text-amber-200 font-semibold flex items-center gap-1.5 shadow-sm mt-1">
+            <Sparkles size={11} className="text-amber-500 dark:text-amber-300" />
+            AI Confidence: {task.confidence}%
+          </div>
+        )}
 
         <div className="border-t border-slate-200/70 dark:border-slate-700/60 pt-3 mt-1">
           <button
@@ -316,36 +512,69 @@ function TaskCard({
         </AnimatePresence>
 
         <div className="flex flex-col gap-2 pt-1">
-          {task.status !== "done" && (
-            <div className="flex flex-col gap-1.5">
-              {onMarkDone && (
-                <button
-                  onClick={() => onMarkDone?.(task.id)}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
-                >
-                  <CheckCircle2 size={13} /> Mark as Done
-                </button>
-              )}
-              {onToggleBlocker && (
-                <button
-                  onClick={() => {
-                    if (task.isBlocked) {
-                      // Resolve Blocker
-                      onToggleBlocker?.(task.id, false, "");
-                    } else {
-                      setShowBlockerModal(true);
-                    }
-                  }}
-                  className={`w-full text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border cursor-pointer ${
-                    task.isBlocked 
-                      ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30"
-                      : "bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30"
-                  }`}
-                >
-                  {task.isBlocked ? "Resolve blocker" : "Report blocker"}
-                </button>
-              )}
+          {showConfirmButtons ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onConfirm?.(task.id)}
+                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+              >
+                <CheckCircle2 size={13} /> Accept
+              </button>
+              <button
+                onClick={() => onDismiss?.(task.id)}
+                className="flex-1 bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 text-[11px] font-semibold rounded-lg py-2 transition-all border border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+              >
+                <X size={13} /> Reject
+              </button>
             </div>
+          ) : (
+            task.status === "done" ? (
+              onMarkActive && (
+                <button
+                  onClick={() => onMarkActive?.(task.id)}
+                  className="w-full bg-white dark:bg-[#15171b] hover:bg-teal-50/60 dark:hover:bg-teal-500/10 text-slate-600 dark:text-slate-300 hover:text-teal-700 dark:hover:text-teal-200 text-[11px] font-semibold rounded-lg py-2 transition-all border border-slate-200/70 dark:border-slate-700/60 dark:hover:border-teal-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                >
+                  <Undo size={13} className="text-teal-500 dark:text-teal-300" /> Send back to active
+                </button>
+              )
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {onMarkDone && (
+                  <button
+                    onClick={() => onMarkDone?.(task.id)}
+                    className="w-full bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border-none cursor-pointer"
+                  >
+                    <CheckCircle2 size={13} /> Mark as Done
+                  </button>
+                )}
+                {onSendToReview && (
+                  <button
+                    onClick={() => onSendToReview?.(task.id)}
+                    className="w-full bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 text-[11px] font-semibold rounded-lg py-2 transition-all border border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                  >
+                    <Undo size={13} className="text-amber-500 dark:text-amber-300" /> Send back to review
+                  </button>
+                )}
+                {onToggleBlocker && (
+                  <button
+                    onClick={() => {
+                      if (task.isBlocked) {
+                        onToggleBlocker?.(task.id, false, "");
+                      } else {
+                        setShowBlockerModal(true);
+                      }
+                    }}
+                    className={`w-full text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border cursor-pointer ${
+                      task.isBlocked
+                        ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30"
+                        : "bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30"
+                    }`}
+                  >
+                    {task.isBlocked ? "Resolve blocker" : "Report blocker"}
+                  </button>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -388,20 +617,33 @@ function DashboardView({
   tasks,
   empName,
   onMarkDone,
+  onConfirm,
+  onDismiss,
   onToggleBlocker,
+  onSendToReview,
+  onMarkActive,
+  onUpdateTask,
+  employeesList,
 }: {
   tasks: Task[];
   empName: string;
   onMarkDone: (id: number | string) => void;
+  onConfirm: (id: number | string) => void;
+  onDismiss: (id: number | string) => void;
   onToggleBlocker: (id: number | string, isBlocked: boolean, note?: string) => void;
+  onSendToReview: (id: number | string) => void;
+  onMarkActive: (id: number | string) => void;
+  onUpdateTask: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  employeesList: string[];
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
   const sourceFiltered = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
-  // Strictly filter to current logged-in employee
-  const filteredTasks = sourceFiltered.filter((t) => t.assignedTo.toLowerCase() === empName.toLowerCase());
+  // Strictly filter to current logged-in employee (case-insensitive)
+  const filteredTasks = sourceFiltered.filter((t) => t.assignedTo && t.assignedTo.toLowerCase() === empName.toLowerCase());
 
   const confirmed = filteredTasks.filter((t) => t.status === "pending" && t.confidence >= 85);
+  const unconfirmed = filteredTasks.filter((t) => t.confidence < 85 && t.status !== "done" && t.status !== "dismissed");
   const done = filteredTasks.filter((t) => t.status === "done");
 
   const sorted = [...confirmed].sort((a, b) => {
@@ -412,7 +654,7 @@ function DashboardView({
 
   const sources: { id: "all" | "email" | "slack" | "fathom"; label: string; icon: React.ReactNode }[] = [
     { id: "all", label: "All My Tasks", icon: <Inbox size={13} className="text-teal-500" /> },
-    { id: "email", label: "Gmail", icon: <Mail size={13} className="text-teal-500" /> },
+    { id: "email", label: "Gmail Inbox", icon: <Mail size={13} className="text-teal-500" /> },
     { id: "slack", label: "Slack Teams", icon: <MessageCircle size={13} className="rotate-90 text-teal-500" /> },
     { id: "fathom", label: "Fathom Meetings", icon: <Video size={13} className="text-teal-500" /> },
   ];
@@ -453,20 +695,55 @@ function DashboardView({
           })}
         </div>
         <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 px-3">
-          <span className="inline-block w-2 h-2 rounded-full bg-teal-500" />
+          <span className="inline-block w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
           <span>Sync active</span>
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Column 1: Active Tasks */}
-        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
+      {/* 3-Column Kanban Board */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Column 1: Needs Review */}
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
+          <div className="flex flex-col gap-1 px-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">Needs Review</h3>
+              </div>
+              <span className="bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-amber-200/60 dark:border-amber-500/30 shadow-sm">{unconfirmed.length}</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Imported tasks (Slack/Email) that you need to confirm or reject.</p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <AnimatePresence>
+              {unconfirmed.length === 0 ? (
+                <EmptyState message="All suggestions reviewed." />
+              ) : (
+                unconfirmed.map((t) => (
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    showConfirmButtons
+                    onConfirm={onConfirm}
+                    onDismiss={onDismiss}
+                    isFounder={false}
+                    onUpdateTask={onUpdateTask}
+                    employeesList={employeesList}
+                  />
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Column 2: Active Tasks */}
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-teal-500" />
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">My Active Tasks</h3>
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">Active Tasks</h3>
               </div>
               <span className="bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-teal-200/60 dark:border-teal-500/30 shadow-sm">{sorted.length}</span>
             </div>
@@ -479,15 +756,24 @@ function DashboardView({
                 <EmptyState message="All caught up. No active tasks right now." />
               ) : (
                 sorted.map((t) => (
-                  <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} onToggleBlocker={onToggleBlocker} />
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    onMarkDone={onMarkDone}
+                    isFounder={false}
+                    onSendToReview={onSendToReview}
+                    onToggleBlocker={onToggleBlocker}
+                    onUpdateTask={onUpdateTask}
+                    employeesList={employeesList}
+                  />
                 ))
               )}
             </AnimatePresence>
           </div>
         </div>
 
-        {/* Column 2: Completed */}
-        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
+        {/* Column 3: Completed */}
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -496,7 +782,7 @@ function DashboardView({
               </div>
               <span className="bg-slate-100 dark:bg-slate-700/40 text-slate-700 dark:text-slate-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-slate-200/60 dark:border-slate-600/50 shadow-sm">{done.length}</span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Tasks that are already delivered.</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Tasks marked as done successfully.</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -505,7 +791,14 @@ function DashboardView({
                 <EmptyState message="No completed tasks yet." />
               ) : (
                 done.map((t) => (
-                  <TaskCard key={t.id} task={t} />
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    isFounder={false}
+                    onMarkActive={onMarkActive}
+                    onUpdateTask={onUpdateTask}
+                    employeesList={employeesList}
+                  />
                 ))
               )}
             </AnimatePresence>
@@ -522,12 +815,24 @@ function ClientView({
   tasks,
   empName,
   onMarkDone,
+  onConfirm,
+  onDismiss,
   onToggleBlocker,
+  onSendToReview,
+  onMarkActive,
+  onUpdateTask,
+  employeesList,
 }: {
   tasks: Task[];
   empName: string;
   onMarkDone: (id: number | string) => void;
+  onConfirm: (id: number | string) => void;
+  onDismiss: (id: number | string) => void;
   onToggleBlocker: (id: number | string, isBlocked: boolean, note?: string) => void;
+  onSendToReview: (id: number | string) => void;
+  onMarkActive: (id: number | string) => void;
+  onUpdateTask: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  employeesList: string[];
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -560,7 +865,7 @@ function ClientView({
     ])
   ).sort();
 
-  const empTasks = tasks.filter((t) => t.assignedTo.toLowerCase() === empName.toLowerCase());
+  const empTasks = tasks.filter((t) => t.assignedTo && t.assignedTo.toLowerCase() === empName.toLowerCase());
   const pending = empTasks.filter((t) => t.status === "pending");
   const total = empTasks.length;
   const highPriority = empTasks.filter((t) => t.priority === "High").length;
@@ -630,7 +935,20 @@ function ClientView({
                             <EmptyState message="No tasks assigned to you for this client" />
                           ) : (
                             clientTasks.map((t) => (
-                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} onToggleBlocker={onToggleBlocker} />
+                              <TaskCard
+                                key={t.id}
+                                task={t}
+                                showConfirmButtons={t.confidence < 85 && t.status !== "done" && t.status !== "dismissed"}
+                                onConfirm={onConfirm}
+                                onDismiss={onDismiss}
+                                onMarkDone={onMarkDone}
+                                onToggleBlocker={onToggleBlocker}
+                                onSendToReview={onSendToReview}
+                                onMarkActive={onMarkActive}
+                                onUpdateTask={onUpdateTask}
+                                isFounder={false}
+                                employeesList={employeesList}
+                              />
                             ))
                           )}
                         </AnimatePresence>
@@ -643,6 +961,383 @@ function ClientView({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Email View component for employee Gmail sync
+
+function EmailView({
+  onToast,
+  loadTasks,
+  setActiveTab,
+  tasks,
+  emails,
+  setEmails,
+  loading,
+  setLoading,
+  selectedId,
+  setSelectedId,
+}: {
+  onToast: (msg: string) => void;
+  loadTasks: () => Promise<void>;
+  setActiveTab: (tab: Tab) => void;
+  tasks: Task[];
+  emails: any[];
+  setEmails: React.Dispatch<React.SetStateAction<any[]>>;
+  loading: boolean;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedId: string | null;
+  setSelectedId: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  const [syncing, setSyncing] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+
+  const getAvatarStyle = (name: string) => {
+    const colors = [
+      { bg: "bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/30" },
+      { bg: "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/30" },
+      { bg: "bg-slate-100 text-slate-600 dark:bg-slate-700/30 dark:text-slate-300", border: "border-slate-200/60 dark:border-slate-600/50" },
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  const fetchRawEmails = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetch("/api/gmail/inbox", { priority: "low" } as any);
+      if (res.status === 401) {
+        disconnectGmail();
+        if (!silent) setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.emails) {
+        setEmails(data.emails);
+        if (data.emails.length > 0 && !selectedId) {
+          setSelectedId(data.emails[0].id);
+        }
+      } else if (data.error) {
+        if (!silent) onToast(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      if (!silent) onToast("Failed to fetch emails.");
+    }
+    if (!silent) setLoading(false);
+  };
+
+  useEffect(() => {
+    const emailCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("gmail_email="));
+    if (emailCookie) {
+      const email = decodeURIComponent(emailCookie.split("=")[1]);
+      if (email) {
+        setConnectedEmail(email);
+        if (emails.length === 0) {
+          fetchRawEmails(false);
+        } else {
+          fetchRawEmails(true);
+        }
+      }
+    }
+  }, []);
+
+  const disconnectGmail = () => {
+    document.cookie = "gmail_token=; Path=/; Max-Age=0";
+    document.cookie = "gmail_email=; Path=/; Max-Age=0";
+    document.cookie = "gmail_refresh_token=; Path=/; Max-Age=0";
+    setConnectedEmail(null);
+    setEmails([]);
+    setSelectedId(null);
+    onToast("Gmail disconnected.");
+  };
+
+  const syncAndAnalyzeWithAI = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/gmail");
+      if (res.status === 401) {
+        onToast("Not authenticated. Please connect Gmail first.");
+        setSyncing(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.tasks) {
+        await loadTasks();
+        await fetchRawEmails();
+        onToast(`Successfully synced inbox. Extracted ${data.tasks.length} tasks.`);
+      } else if (data.error) {
+        onToast(`Error: ${data.error}`);
+      }
+    } catch (e) {
+      onToast("AI sync failed.");
+    }
+    setSyncing(false);
+  };
+
+  const selectedEmail = emails.find((e) => e.id === selectedId);
+  const associatedTask = selectedEmail ? tasks.find((t) => t.sourceMessageId === selectedEmail.id) : null;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Mail className="text-teal-600" size={24} />
+            Email Integration
+          </h1>
+          {connectedEmail ? (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-teal-500" />
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                Connected: <strong className="text-slate-800 dark:text-slate-200">{connectedEmail}</strong>
+              </span>
+              <button
+                onClick={disconnectGmail}
+                className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200 ml-2 underline cursor-pointer font-medium"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+              <span className="inline-block w-2 h-2 rounded-full bg-slate-400" />
+              Not connected
+            </p>
+          )}
+        </div>
+
+        {connectedEmail && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchRawEmails()}
+              disabled={loading || syncing}
+              className="flex items-center gap-2 bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 px-3.5 py-1.5 rounded-lg font-semibold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all text-sm disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin text-slate-400" : ""} />
+              Refresh
+            </button>
+
+            <button
+              onClick={syncAndAnalyzeWithAI}
+              disabled={loading || syncing}
+              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded-lg font-semibold shadow-sm transition-all text-sm disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {syncing ? "Analyzing inbox..." : "Sync and analyze"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!connectedEmail ? (
+        <div className="flex flex-col items-center justify-center border border-dashed border-slate-200/70 dark:border-slate-700/60 rounded-2xl p-12 text-center bg-white dark:bg-[#15171b] shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center text-teal-600 mb-4 border border-teal-200/60 dark:border-teal-500/30">
+            <Mail size={32} />
+          </div>
+          <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">Connect Your Gmail Account</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+            TaskPulse uses secure Google OAuth to scan your inbox and parse deliverables into tasks.
+          </p>
+          <button
+            onClick={() => { window.location.href = "/api/auth/login"; }}
+            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2.5 rounded-xl font-semibold shadow-sm transition-all text-sm cursor-pointer"
+          >
+            Connect Gmail Securely
+          </button>
+        </div>
+      ) : (
+        <div className="flex rounded-2xl overflow-hidden shadow-sm border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#15171b]" style={{ height: "calc(100vh - 240px)", minHeight: 480 }}>
+          <div className="w-96 flex-shrink-0 border-r border-slate-200/70 dark:border-slate-700/60 flex flex-col bg-white dark:bg-[#111318]">
+            <div className="border-b border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#15171b] px-4 py-3 font-semibold text-sm text-slate-700 dark:text-slate-300 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Inbox size={15} className="text-teal-500" />
+                Inbox ({emails.length} email{emails.length !== 1 ? "s" : ""})
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {loading && emails.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500 gap-2">
+                  <Loader2 size={24} className="animate-spin text-teal-500" />
+                  <p className="text-xs">Loading emails from Gmail...</p>
+                </div>
+              ) : emails.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500 text-center px-4">
+                  <Mail size={24} className="mb-2 text-slate-300 dark:text-slate-600" />
+                  <p className="text-xs font-semibold">Your Gmail inbox is empty</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-1 max-w-[200px]">Or we could not fetch messages. Click Refresh to retry.</p>
+                </div>
+              ) : (
+                emails.map((e) => {
+                  const avatar = getAvatarStyle(e.fromName);
+                  const isSelected = selectedId === e.id;
+
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelectedId(e.id)}
+                      className={`w-full text-left px-4 py-3 flex gap-3 transition-colors text-xs items-start cursor-pointer border-b border-slate-100 dark:border-slate-800 ${
+                        isSelected
+                          ? "bg-teal-50/60 dark:bg-teal-500/10 border-l-[3px] border-l-teal-500"
+                          : e.isUnread
+                            ? "bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800/60"
+                            : "bg-white dark:bg-[#111318] hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-semibold border text-sm shadow-sm ${avatar.bg} ${avatar.border}`}>
+                        {e.fromName ? e.fromName.charAt(0).toUpperCase() : "?"}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-0.5">
+                          <p className={`text-xs truncate max-w-[170px] ${e.isUnread ? "font-semibold text-slate-900 dark:text-slate-100" : "text-slate-600 dark:text-slate-400"}`}>
+                            {e.fromName}
+                          </p>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0 ml-1 font-medium">{e.date}</span>
+                        </div>
+
+                        <p className={`text-xs truncate mb-0.5 ${e.isUnread ? "font-semibold text-slate-800 dark:text-slate-200" : "text-slate-600 dark:text-slate-400"}`}>
+                          {e.subject}
+                        </p>
+
+                        <p className="text-[11px] text-slate-500 dark:text-slate-500 line-clamp-2 leading-tight">
+                          {e.snippet.length > 60 ? e.snippet.substring(0, 60) + "..." : e.snippet}
+                        </p>
+
+                        <div className="flex gap-1.5 mt-1.5 items-center flex-wrap">
+                          {e.isUnread && (
+                            <span className="text-[9px] bg-teal-600 text-white font-semibold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm">
+                              Unread
+                            </span>
+                          )}
+                          {associatedTask && (
+                            <span className="text-[9px] bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-200 font-semibold px-1.5 py-0.5 rounded border border-teal-200/60 dark:border-teal-500/30 flex items-center gap-0.5 shadow-sm">
+                              <Sparkles size={8} /> Synced Task
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col bg-white dark:bg-[#15171b] overflow-y-auto">
+            <div className="bg-teal-600 dark:bg-teal-700 px-6 py-3.5 flex-shrink-0 text-white font-semibold text-xs flex justify-between items-center shadow-sm">
+              <span>Gmail Content Viewer</span>
+              {selectedEmail && (
+                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                  ID: {selectedEmail.id}
+                </span>
+              )}
+            </div>
+
+            {selectedEmail ? (
+              <div className="px-8 py-6 flex-1 flex flex-col">
+                <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 mb-4 leading-snug">
+                  {selectedEmail.subject}
+                </h2>
+
+                <div className="flex flex-col md:flex-row md:justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 mb-6 pb-6 border-b border-slate-200/70 dark:border-slate-700/60">
+                  <div className="flex flex-col gap-1">
+                    <span>
+                      <strong className="text-slate-700 dark:text-slate-300">From:</strong> {selectedEmail.fromName}{" "}
+                      <span className="text-slate-400 dark:text-slate-500">&lt;{selectedEmail.fromEmail}&gt;</span>
+                    </span>
+                    <span>
+                      <strong className="text-slate-700 dark:text-slate-300">To:</strong> me (via OAuth API)
+                    </span>
+                  </div>
+                  <div className="md:text-right">
+                    <span>
+                      <strong className="text-slate-700 dark:text-slate-300">Date:</strong> {selectedEmail.date}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-slate-700 dark:text-slate-300 leading-relaxed text-sm mb-8 max-w-3xl whitespace-pre-wrap font-sans bg-slate-50/30 dark:bg-white/[0.02] p-6 rounded-xl border border-slate-200/70 dark:border-slate-700/60 flex-1">
+                  {selectedEmail.snippet}
+                </div>
+
+                {associatedTask ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-teal-50/50 dark:bg-teal-500/10 border border-teal-200/70 dark:border-teal-500/30 rounded-xl p-5"
+                  >
+                    <h3 className="font-semibold text-teal-800 dark:text-teal-200 text-sm mb-3 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-teal-500" />
+                      TaskPulse Extracted Task
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-4">
+                      <div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">Task Title</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">{associatedTask.title}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">Assigned To</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                          <User size={12} className="text-teal-400" /> {associatedTask.assignedTo}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">Priority</p>
+                        <span className={`inline-block font-semibold text-[10px] px-2 py-0.5 rounded-full ${
+                          associatedTask.priority === "High" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200" :
+                          associatedTask.priority === "Medium" ? "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200" :
+                          "bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-200"
+                        }`}>
+                          {associatedTask.priority}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-0.5">Deadline</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                          <Calendar size={12} className="text-teal-400" /> {formatDate(associatedTask.deadline)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("dashboard")}
+                      className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <CheckCircle2 size={12} />
+                      View on Dashboard
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="bg-slate-50 dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-xl p-5 text-center text-slate-500 dark:text-slate-400 text-xs flex flex-col items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-500" />
+                    <span>No task extracted from this email yet.</span>
+                    <button
+                      onClick={syncAndAnalyzeWithAI}
+                      disabled={syncing || loading}
+                      className="mt-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      Scan Inbox
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                <Mail size={36} className="mb-2 text-slate-300 dark:text-slate-600" />
+                <p className="text-sm font-semibold">No Email Selected</p>
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 font-medium">Select an email from the inbox list to read it.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -661,8 +1356,12 @@ export default function EmployeeDashboard() {
     designation: "founder" | "employee";
   } | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [emailSelectedId, setEmailSelectedId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
   const addToast = (message: string) => {
@@ -684,6 +1383,20 @@ export default function EmployeeDashboard() {
       console.error(err);
     } finally {
       setLoadingTasks(false);
+    }
+  };
+
+  const loadEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setEmployees(data);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load employees in employee portal:", err);
     }
   };
 
@@ -744,21 +1457,26 @@ export default function EmployeeDashboard() {
     setMounted(true);
     if (status === "authenticated" && session) {
       loadProfileAndTasks();
+      loadEmployees();
     } else if (status === "unauthenticated") {
       router.push("/");
     }
   }, [status, session]);
 
+  // Real-time synchronization polling (3 seconds interval)
+  useEffect(() => {
+    if (status === "authenticated") {
+      const interval = setInterval(() => {
+        loadTasks();
+        loadEmployees();
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [status]);
+
   const getEmployeeName = () => {
     if (profile?.name) return profile.name;
-    if (!session?.user?.name) return "Rahul";
-    const nameLower = session.user.name.toLowerCase();
-    for (const emp of EMPLOYEES) {
-      if (nameLower.includes(emp.toLowerCase())) {
-        return emp;
-      }
-    }
-    return "Rahul";
+    return session?.user?.name || "Rahul";
   };
   const empName = getEmployeeName();
 
@@ -773,6 +1491,98 @@ export default function EmployeeDashboard() {
         body: JSON.stringify({ id, status: "done" }),
       });
     } catch {}
+  };
+
+  const confirmTask = async (id: number | string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 95 } : t));
+    addToast("Task confirmed and added to active!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "confirmed" }),
+        });
+      } catch {}
+    }
+  };
+
+  const sendTaskToReview = async (id: number | string) => {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 80 } : t));
+    addToast("Task sent back to review!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "unconfirmed" }),
+        });
+      } catch {}
+    }
+  };
+
+  const sendTaskToActive = async (id: number | string) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, status: "pending", confidence: 95 } : t
+      )
+    );
+    addToast("Task sent back to active!");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "confirmed" }),
+        });
+      } catch {}
+    }
+  };
+
+  const dismissTask = async (id: number | string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    addToast("Task dismissed.");
+
+    if (typeof id === "string") {
+      try {
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "dismissed" }),
+        });
+      } catch {}
+    }
+  };
+
+  const updateTask = async (id: number | string, updatedFields: Partial<Task>) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t))
+    );
+    addToast("Task updated successfully!");
+
+    if (typeof id === "string") {
+      try {
+        const body: any = { id };
+        if (updatedFields.title !== undefined) body.title = updatedFields.title;
+        if (updatedFields.priority !== undefined) body.priority = updatedFields.priority;
+        if (updatedFields.deadline !== undefined) body.deadline = updatedFields.deadline;
+        if (updatedFields.client !== undefined) body.client = updatedFields.client;
+        if (updatedFields.assignedTo !== undefined) body.assignee = updatedFields.assignedTo;
+        if (updatedFields.isBlocked !== undefined) body.isBlocked = updatedFields.isBlocked;
+        if (updatedFields.blockerNote !== undefined) body.blockerNote = updatedFields.blockerNote;
+
+        await fetch("/api/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        console.error("Failed to update task on backend:", err);
+      }
+    }
   };
 
   const toggleBlocker = async (id: number | string, isBlocked: boolean, note?: string) => {
@@ -807,11 +1617,11 @@ export default function EmployeeDashboard() {
     router.push("/founder");
   };
 
-  if (status === "loading" || loadingTasks || loadingProfile) {
+  if (!mounted || status === "loading" || loadingTasks || loadingProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#121316]">
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#0b0c0e]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          <div className="w-8 h-8 rounded-full border-2 border-teal-600 border-t-transparent animate-spin" />
           <p className="text-xs text-slate-500 font-semibold animate-pulse">Loading workspace...</p>
         </div>
       </div>
@@ -826,15 +1636,20 @@ export default function EmployeeDashboard() {
     { id: "email", label: "Email", icon: <Mail size={15} /> },
   ];
 
+  const employeesList = Array.from(new Set([
+    ...employees.map((e) => e.name),
+    "Rahul", "Priya", "Admin", "Vikas"
+  ]));
+
   return (
-    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#121316] transition-colors duration-300">
+    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#0b0c0e] transition-colors duration-300">
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
 
-      <header className="sticky top-0 z-50 bg-[#f7f6f2]/90 dark:bg-[#121316]/90 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-700/60 h-[64px] flex items-center px-6 transition-colors duration-300">
+      <header className="sticky top-0 z-50 bg-[#f7f6f2]/90 dark:bg-[#0e0f12]/90 backdrop-blur-md border-b border-slate-200/70 dark:border-[#1c1d22] h-[64px] flex items-center px-6 transition-colors duration-300">
         <div className="flex items-center gap-4 min-w-[240px]">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeft size={14} />
             Back to landing
@@ -899,11 +1714,11 @@ export default function EmployeeDashboard() {
           )}
 
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40 transition-all border border-slate-200/60 dark:border-slate-600/50 hover:border-slate-300 dark:hover:border-slate-500 shadow-sm flex items-center justify-center cursor-pointer"
             title="Toggle Theme"
           >
-            {mounted && theme === "dark" ? (
+            {mounted && resolvedTheme === "dark" ? (
               <Sun size={15} className="text-amber-500" />
             ) : (
               <Moon size={15} className="text-teal-600 dark:text-teal-300" />
@@ -927,7 +1742,13 @@ export default function EmployeeDashboard() {
                 tasks={tasks}
                 empName={empName}
                 onMarkDone={markDone}
+                onConfirm={confirmTask}
+                onDismiss={dismissTask}
                 onToggleBlocker={toggleBlocker}
+                onSendToReview={sendTaskToReview}
+                onMarkActive={sendTaskToActive}
+                onUpdateTask={updateTask}
+                employeesList={employeesList}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
@@ -936,7 +1757,13 @@ export default function EmployeeDashboard() {
                 tasks={tasks}
                 empName={empName}
                 onMarkDone={markDone}
+                onConfirm={confirmTask}
+                onDismiss={dismissTask}
                 onToggleBlocker={toggleBlocker}
+                onSendToReview={sendTaskToReview}
+                onMarkActive={sendTaskToActive}
+                onUpdateTask={updateTask}
+                employeesList={employeesList}
               />
             )}
             {activeTab === "slack" && (
@@ -947,21 +1774,18 @@ export default function EmployeeDashboard() {
               />
             )}
             {activeTab === "email" && (
-              <div className="bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-2xl p-8 text-center max-w-xl mx-auto">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700/40 flex items-center justify-center mx-auto mb-4">
-                  <Mail size={20} className="text-teal-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Gmail Inbox Extraction</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                  Email extraction is managed by the organization owner. New deliverables assigned to your profile will appear in your active task list automatically.
-                </p>
-                <button
-                  onClick={() => setActiveTab("dashboard")}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all cursor-pointer border-none"
-                >
-                  Return to dashboard
-                </button>
-              </div>
+              <EmailView
+                onToast={addToast}
+                loadTasks={loadTasks}
+                setActiveTab={setActiveTab}
+                tasks={tasks}
+                emails={emails}
+                setEmails={setEmails}
+                loading={loadingEmails}
+                setLoading={setLoadingEmails}
+                selectedId={emailSelectedId}
+                setSelectedId={setEmailSelectedId}
+              />
             )}
           </motion.div>
         </AnimatePresence>

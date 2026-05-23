@@ -149,10 +149,12 @@ export async function GET(request: Request) {
   // Fetch current user's profile to resolve company
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("company")
+    .select("company, name, designation")
     .eq("id", userId)
     .single()
   const company = profile?.company || null
+  const userName = profile?.name || null
+  const designation = profile?.designation || null
 
   // Fetch registered whitelisted clients for this company
   let registeredClients: string[] = []
@@ -374,6 +376,12 @@ Respond ONLY with the requested JSON array representing tasks found.`
 
           // Auto-save task into Supabase database with message ID deduplication
           try {
+            let taskAssignee = task.assignee || "Unassigned";
+            if (designation === "employee") {
+              // For employees syncing their own email, default task assignment to themselves
+              taskAssignee = userName || "Unassigned";
+            }
+
             const { data, error } = await supabaseAdmin
               .from("tasks")
               .insert({
@@ -382,7 +390,7 @@ Respond ONLY with the requested JSON array representing tasks found.`
                 title: task.task_title,
                 priority: task.priority || "Medium",
                 deadline: task.deadline || null,
-                assignee: task.assignee || "Unassigned",
+                assignee: taskAssignee,
                 confidence: task.confidence || 85,
                 status: task.confidence >= 85 ? "confirmed" : "unconfirmed",
                 source_platform: "email",

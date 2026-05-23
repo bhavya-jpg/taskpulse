@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowLeft,
   BarChart2,
   Calendar,
   CheckCircle2,
@@ -178,6 +179,7 @@ function TaskCard({
   showConfirmButtons = false,
   showFrom = false,
   isFounder = false,
+  employeesList,
 }: {
   task: Task;
   onMarkDone?: (id: number | string) => void;
@@ -191,6 +193,7 @@ function TaskCard({
   showConfirmButtons?: boolean;
   showFrom?: boolean;
   isFounder?: boolean;
+  employeesList?: string[];
 }) {
   const [showSource, setShowSource] = useState(false);
   const [showBlockerModal, setShowBlockerModal] = useState(false);
@@ -198,6 +201,8 @@ function TaskCard({
   const pc = PRIORITY_CONFIG[task.priority];
   const cc = getClientColors(task.client);
   const overdue = isOverdue(task.deadline) && task.status !== "done";
+
+  const activeEmployees = employeesList || EMPLOYEES;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -278,7 +283,7 @@ function TaskCard({
               onChange={(e) => setEditAssignee(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold outline-none cursor-pointer"
             >
-              {EMPLOYEES.map((emp) => (
+              {activeEmployees.map((emp) => (
                 <option key={emp} value={emp}>{emp}</option>
               ))}
             </select>
@@ -423,7 +428,7 @@ function TaskCard({
                 onChange={(e) => onReassign?.(task.id, e.target.value)}
                 className="bg-teal-50/80 dark:bg-[#121316] border border-teal-200/60 dark:border-teal-500/20 rounded-lg px-2 py-0.5 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold cursor-pointer transition-colors"
               >
-                {EMPLOYEES.map((emp) => (
+                {activeEmployees.map((emp) => (
                   <option key={emp} value={emp}>{emp}</option>
                 ))}
               </select>
@@ -617,6 +622,7 @@ function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: 
 function ManualTaskCreator({
   onAddTask,
   tasks,
+  employeesList,
 }: {
   onAddTask: (task: {
     title: string;
@@ -626,6 +632,7 @@ function ManualTaskCreator({
     priority: Priority;
   }) => Promise<void>;
   tasks: Task[];
+  employeesList?: string[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -634,8 +641,10 @@ function ManualTaskCreator({
     new Set(["Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")])
   );
 
+  const activeEmployees = employeesList || EMPLOYEES;
+
   const [client, setClient] = useState(dynamicClients[0]);
-  const [assignedTo, setAssignedTo] = useState(EMPLOYEES[0]);
+  const [assignedTo, setAssignedTo] = useState(activeEmployees[0]);
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [submitting, setSubmitting] = useState(false);
@@ -645,6 +654,12 @@ function ManualTaskCreator({
       setClient(dynamicClients[0]);
     }
   }, [tasks]);
+
+  useEffect(() => {
+    if (!activeEmployees.includes(assignedTo) && activeEmployees.length > 0) {
+      setAssignedTo(activeEmployees[0]);
+    }
+  }, [employeesList]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -720,7 +735,7 @@ function ManualTaskCreator({
                   onChange={(e) => setAssignedTo(e.target.value)}
                   className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-semibold"
                 >
-                  {EMPLOYEES.map((e) => (
+                  {activeEmployees.map((e) => (
                     <option key={e} value={e}>{e}</option>
                   ))}
                 </select>
@@ -788,6 +803,7 @@ function DashboardView({
   onSendToReview,
   onUpdateTask,
   onMarkActive,
+  employeesList,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
@@ -805,6 +821,7 @@ function DashboardView({
   onSendToReview: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
   onMarkActive: (id: number | string) => void;
+  employeesList?: string[];
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
@@ -890,7 +907,7 @@ function DashboardView({
         </motion.div>
       )}
 
-      <ManualTaskCreator onAddTask={onAddTask} tasks={tasks} />
+      <ManualTaskCreator onAddTask={onAddTask} tasks={tasks} employeesList={employeesList} />
 
       <div className="flex justify-between items-center bg-white dark:bg-[#15171b] p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-100/70 dark:bg-slate-700/30 rounded-xl border border-slate-200/60 dark:border-slate-600/50">
@@ -919,7 +936,7 @@ function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -937,14 +954,14 @@ function DashboardView({
                 <EmptyState message="All suggestions reviewed." />
               ) : (
                 unconfirmed.map((t) => (
-                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} />
+                  <TaskCard key={t.id} task={t} showConfirmButtons onConfirm={onConfirm} onDismiss={onDismiss} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} employeesList={employeesList} />
                 ))
               )}
             </AnimatePresence>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -970,6 +987,7 @@ function DashboardView({
                     onReassign={onReassign}
                     onSendToReview={onSendToReview}
                     onUpdateTask={onUpdateTask}
+                    employeesList={employeesList}
                   />
                 ))
               )}
@@ -977,7 +995,7 @@ function DashboardView({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#15171b] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 shadow-sm min-h-[500px]">
+        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -995,7 +1013,7 @@ function DashboardView({
                 <EmptyState message="No tasks done yet." />
               ) : (
                 done.map((t) => (
-                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} />
+                  <TaskCard key={t.id} task={t} isFounder={true} onReassign={onReassign} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
                 ))
               )}
             </AnimatePresence>
@@ -1013,11 +1031,13 @@ function ClientView({
   onMarkDone,
   onUpdateTask,
   onMarkActive,
+  employeesList,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
   onMarkActive?: (id: number | string) => void;
+  employeesList?: string[];
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -1252,7 +1272,7 @@ function ClientView({
                             <EmptyState message="No tasks for this client" />
                           ) : (
                              clientTasks.map((t) => (
-                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} />
+                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
                             ))
                           )}
                         </AnimatePresence>
@@ -1276,15 +1296,24 @@ function EmployeeView({
   onMarkDone,
   onUpdateTask,
   onMarkActive,
+  employeesList,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
   onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
   onMarkActive?: (id: number | string) => void;
+  employeesList?: string[];
 }) {
-  const [selected, setSelected] = useState("Rahul");
+  const activeEmployees = employeesList || EMPLOYEES;
+  const [selected, setSelected] = useState(activeEmployees[0] || "Rahul");
 
-  const empTasks = tasks.filter((t) => t.assignedTo === selected);
+  useEffect(() => {
+    if (!activeEmployees.includes(selected) && activeEmployees.length > 0) {
+      setSelected(activeEmployees[0]);
+    }
+  }, [employeesList]);
+
+  const empTasks = tasks.filter((t) => t.assignedTo.toLowerCase() === selected.toLowerCase());
   const pending = empTasks.filter((t) => t.status === "pending").length;
   const done = empTasks.filter((t) => t.status === "done").length;
   const overdue = empTasks.filter((t) => isOverdue(t.deadline) && t.status !== "done").length;
@@ -1298,7 +1327,7 @@ function EmployeeView({
           onChange={(e) => setSelected(e.target.value)}
           className="border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-[#15171b] shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
         >
-          {EMPLOYEES.map((e) => (
+          {activeEmployees.map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>
@@ -1332,7 +1361,7 @@ function EmployeeView({
             <EmptyState message="No tasks assigned to this employee." />
           ) : (
              empTasks.map((t) => (
-              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} />
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} showFrom isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
             ))
           )}
         </AnimatePresence>
@@ -1821,171 +1850,13 @@ function WhatsAppView({
 
 // Demo Mode Panel
 
-function DemoModePanel({ tasks, setTasks, onToast }: {
-  tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  onToast: (msg: string) => void;
-}) {
-  const [input, setInput] = useState("");
-  const [source, setSource] = useState("slack");
 
-  const dynamicClients = Array.from(
-    new Set(["Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")])
-  );
-
-  const [client, setClient] = useState(dynamicClients[0]);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Task | null>(null);
-
-  useEffect(() => {
-    if (!dynamicClients.includes(client)) {
-      setClient(dynamicClients[0]);
-    }
-  }, [tasks]);
-
-  const extract = () => {
-    if (!input.trim()) return;
-    setLoading(true);
-    setResult(null);
-    setTimeout(() => {
-      const title = input.trim().length > 60 ? input.trim().slice(0, 60) + "..." : input.trim();
-      const confidence = Math.floor(Math.random() * 18) + 78;
-      const priorities: Priority[] = ["High", "Medium"];
-      const priority = priorities[Math.floor(Math.random() * 2)];
-      const assignedTo = EMPLOYEES[Math.floor(Math.random() * EMPLOYEES.length)];
-      const deadline = new Date();
-      deadline.setDate(deadline.getDate() + 3);
-      const deadlineStr = deadline.toISOString().split("T")[0];
-      const newTask: Task = {
-        id: Date.now(),
-        title,
-        client,
-        assignedTo,
-        deadline: deadlineStr,
-        priority,
-        source: source as Source,
-        sourceGroup: `${client} ${source === "slack" ? "Slack Channel" : "Email Thread"}`,
-        status: "pending",
-        confidence,
-        sourceMessage: input.trim(),
-      };
-      setResult(newTask);
-      setLoading(false);
-    }, 1500);
-  };
-
-  const addToDashboard = () => {
-    if (!result) return;
-    setTasks((prev) => [...prev, result]);
-    setResult(null);
-    setInput("");
-    onToast("Task added to dashboard!");
-  };
-
-  return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: "auto", opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      className="overflow-hidden"
-    >
-      <div className="bg-amber-50/80 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/30 rounded-2xl p-5 mx-0 mb-6">
-        <h3 className="font-semibold text-amber-900 dark:text-amber-200 text-sm mb-3 flex items-center gap-2">
-          <Sparkles size={15} className="text-amber-500" />
-          Demo Mode - Simulate AI Task Extraction
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
-          <textarea
-            rows={3}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Paste any message here - Slack or Email..."
-            className="border border-amber-200/70 dark:border-amber-500/30 rounded-xl px-4 py-3 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-[#15171b] resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-600"
-          />
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="border border-amber-200/70 dark:border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-[#15171b] focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-600"
-          >
-            <option value="slack">Slack</option>
-            <option value="email">Email</option>
-          </select>
-          <select
-            value={client}
-            onChange={(e) => setClient(e.target.value)}
-            className="border border-amber-200/70 dark:border-amber-500/30 rounded-xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-[#15171b] focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-600"
-          >
-            {dynamicClients.map((c) => <option key={c} value={c}>{c}</option>)}
-            <option value="Unknown">Unknown</option>
-          </select>
-          <button
-            onClick={extract}
-            disabled={loading || !input.trim()}
-            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold text-sm rounded-xl px-4 py-2.5 flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : "Extract"}
-          </button>
-        </div>
-
-        <AnimatePresence>
-          {result && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mt-4 bg-white dark:bg-[#15171b] border border-emerald-200/70 dark:border-emerald-500/30 rounded-xl overflow-hidden shadow-sm"
-            >
-              <div className="bg-emerald-600 text-white px-4 py-2 text-sm font-semibold">
-                Task Successfully Extracted
-              </div>
-              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Task</p>
-                  <p className="font-semibold text-slate-800 dark:text-slate-200">{result.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Assigned To</p>
-                  <p className="font-semibold text-slate-800 dark:text-slate-200">{result.assignedTo}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Priority</p>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${result.priority === "High" ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200" : "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200"}`}>
-                    {result.priority}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Confidence</p>
-                  <p className="font-semibold text-emerald-700 dark:text-emerald-400">{result.confidence}%</p>
-                </div>
-              </div>
-              <div className="px-4 pb-4 flex gap-2">
-                <button
-                  onClick={addToDashboard}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
-                >
-                  Add to Dashboard
-                </button>
-                <button
-                  onClick={() => setResult(null)}
-                  className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/30 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  );
-}
 
 // Login page
 
 function LoginPage({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#121316] text-slate-900 dark:text-slate-100 flex items-center justify-center px-6">
+    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#0b0c0e] text-slate-900 dark:text-slate-100 flex items-center justify-center px-6">
       <div className="max-w-5xl w-full grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
         <div className="space-y-6">
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-teal-600 dark:text-teal-400 bg-teal-100/70 dark:bg-teal-500/10 px-3 py-1 rounded-full w-fit">
@@ -2082,12 +1953,12 @@ function OnboardingPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#121316] text-slate-900 dark:text-slate-100 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#0b0c0e] text-slate-900 dark:text-slate-100 flex items-center justify-center px-4 py-8">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4 }}
-        className="bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-3xl p-8 max-w-lg w-full shadow-sm space-y-6"
+        className="bg-white dark:bg-[#181a1f] border border-slate-200/70 dark:border-[#272a31] rounded-3xl p-8 max-w-lg w-full shadow-sm space-y-6"
       >
         <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-700/60 pb-4.5">
           <div className="space-y-1">
@@ -2299,6 +2170,27 @@ export default function FounderPage() {
     designation: "founder" | "employee";
   } | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  const loadEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setEmployees(data);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load employees:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (onboarded && onboardingData?.designation === "founder") {
+      loadEmployees();
+    }
+  }, [onboarded, onboardingData]);
 
   useEffect(() => {
     if (onboarded && onboardingData?.designation === "employee") {
@@ -2386,9 +2278,21 @@ export default function FounderPage() {
   }, [status, session]);
 
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const [demoMode, setDemoMode] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
+  // Real-time synchronization polling (3 seconds interval)
+  useEffect(() => {
+    if (status === "authenticated") {
+      const interval = setInterval(() => {
+        loadTasks();
+        if (onboarded && onboardingData?.designation === "founder") {
+          loadEmployees();
+        }
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [status, onboarded, onboardingData]);
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -2398,12 +2302,14 @@ export default function FounderPage() {
 
   const dismissToast = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
 
+  if (!mounted) return null;
+
   if (status === "loading" || onboarded === null || loadingTasks || loadingProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#121316]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-          <p className="text-xs text-slate-500 font-semibold animate-pulse">Loading session...</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#0b0c0e]" suppressHydrationWarning>
+        <div className="flex flex-col items-center gap-3" suppressHydrationWarning>
+          <div className="w-8 h-8 rounded-full border-2 border-teal-600 border-t-transparent animate-spin" suppressHydrationWarning />
+          <p className="text-xs text-slate-500 font-semibold animate-pulse" suppressHydrationWarning>Loading session...</p>
         </div>
       </div>
     );
@@ -2444,9 +2350,9 @@ export default function FounderPage() {
 
   if (onboardingData?.designation === "employee") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#121316] text-slate-900 dark:text-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#0b0c0e] text-slate-900 dark:text-slate-100">
         <div className="flex flex-col items-center gap-4 text-center px-4 max-w-sm">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+          <div className="w-8 h-8 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
           <h2 className="text-xl font-semibold">Redirecting to Employee Console</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
             Please wait while we route your authenticated session to the /employee workspace.
@@ -2535,15 +2441,13 @@ export default function FounderPage() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     addToast("Task dismissed.");
 
-    if (typeof id === "string") {
-      try {
-        await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, status: "dismissed" }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "dismissed" }),
+      });
+    } catch {}
   };
 
   const reassignTask = async (id: number | string, newAssignee: string) => {
@@ -2617,9 +2521,8 @@ export default function FounderPage() {
     );
     addToast("Task updated successfully!");
 
-    if (typeof id === "string") {
-      try {
-        const body: any = { id };
+    try {
+      const body: any = { id };
         if (updatedFields.title !== undefined) body.title = updatedFields.title;
         if (updatedFields.priority !== undefined) body.priority = updatedFields.priority;
         if (updatedFields.deadline !== undefined) body.deadline = updatedFields.deadline;
@@ -2636,19 +2539,24 @@ export default function FounderPage() {
       } catch (err) {
         console.error("Failed to update task on backend:", err);
       }
-    }
   };
 
+  const employeesList = Array.from(new Set([
+    ...employees.map((e) => e.name),
+    "Rahul", "Priya", "Admin", "Vikas"
+  ]));
+
   return (
-    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#121316] transition-colors duration-300">
+    <div className="min-h-screen bg-[#f7f6f2] dark:bg-[#0b0c0e] transition-colors duration-300">
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
 
-      <header className="sticky top-0 z-50 bg-[#f7f6f2]/90 dark:bg-[#121316]/90 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-700/60 h-[64px] flex items-center px-6 transition-colors duration-300">
+      <header className="sticky top-0 z-50 bg-[#f7f6f2]/90 dark:bg-[#0e0f12]/90 backdrop-blur-md border-b border-slate-200/70 dark:border-[#1c1d22] h-[64px] flex items-center px-6 transition-colors duration-300">
         <div className="flex items-center gap-4 min-w-[240px]">
           <Link
             href="/"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
+            <ArrowLeft size={14} />
             Back to landing
           </Link>
           <div className="flex items-center gap-2">
@@ -2667,7 +2575,7 @@ export default function FounderPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-0 ${
                 activeTab === tab.id
                   ? "bg-teal-600 text-white shadow-sm"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40"
@@ -2679,7 +2587,7 @@ export default function FounderPage() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4 min-w-[260px] justify-end">
+        <div className="flex items-center gap-3 flex-shrink-0 justify-end">
           {session?.user && (
             <div className="flex items-center gap-2 bg-white/70 dark:bg-slate-700/30 border border-slate-200/60 dark:border-slate-600/50 rounded-xl px-2 py-1 shadow-sm">
               {session.user.image ? (
@@ -2717,38 +2625,20 @@ export default function FounderPage() {
           )}
 
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-700/40 transition-all border border-slate-200/60 dark:border-slate-600/50 hover:border-slate-300 dark:hover:border-slate-500 shadow-sm flex items-center justify-center cursor-pointer"
             title="Toggle Theme"
           >
-            {mounted && theme === "dark" ? (
+            {mounted && resolvedTheme === "dark" ? (
               <Sun size={15} className="text-amber-500" />
             ) : (
               <Moon size={15} className="text-teal-600 dark:text-teal-300" />
             )}
           </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Demo Mode</span>
-            <button
-              onClick={() => setDemoMode((p) => !p)}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${demoMode ? "bg-teal-600" : "bg-slate-300"}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${demoMode ? "translate-x-5" : "translate-x-0"}`}
-              />
-            </button>
-          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
-        <AnimatePresence>
-          {demoMode && (
-            <DemoModePanel tasks={tasks} setTasks={setTasks} onToast={addToast} />
-          )}
-        </AnimatePresence>
-
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -2769,14 +2659,15 @@ export default function FounderPage() {
                 onSendToReview={sendTaskToReview}
                 onUpdateTask={updateTask}
                 onMarkActive={sendTaskToActive}
+                employeesList={employeesList}
               />
             )}
             {activeTab === "meetings" && <MeetingTab />}
             {activeTab === "client" && (
-              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} />
+              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} />
             )}
             {activeTab === "employee" && (
-              <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} />
+              <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} />
             )}
             {activeTab === "slack" && (
               <SlackSetup

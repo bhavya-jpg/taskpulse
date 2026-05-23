@@ -3,6 +3,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+const SEED_TASKS = [
+  { title: "Send revised creatives to Flipkart", assignee: "Rahul", deadline: "2026-05-18", priority: "High", source_platform: "slack", source_group_name: "Flipkart Campaign", status: "confirmed", confidence: 95, source_message_text: "Can someone send the revised creatives before 6 PM today? The client is waiting. This is urgent." },
+  { title: "Finalize proposal document for Zomato", assignee: "Priya", deadline: "2026-05-19", priority: "High", source_platform: "email", source_group_name: "Zomato Strategy Thread", status: "confirmed", confidence: 88, source_message_text: "Hi team, we need the proposal finalized by tomorrow EOD. Please review the attached doc and send it across." },
+  { title: "Update social media posts for Amazon", assignee: "Priya", deadline: "2026-05-17", priority: "Medium", source_platform: "email", source_group_name: "Amazon Campaign", status: "unconfirmed", confidence: 72, source_message_text: "Dekha jayega if we can push the posts out by tomorrow? Client ka pressure hai bhai." },
+  { title: "Send May invoice to Flipkart", assignee: "Admin", deadline: "2026-05-20", priority: "Medium", source_platform: "email", source_group_name: "Flipkart Campaign", status: "done", confidence: 92, source_message_text: "Please send the May invoice to Flipkart by end of week. Accounts team is waiting." },
+  { title: "Design banner for Google Ads campaign", assignee: "Rahul", deadline: "2026-05-17", priority: "High", source_platform: "slack", source_group_name: "Google Campaign", status: "confirmed", confidence: 91, source_message_text: "@Rahul please design the banner for the Google Ads campaign by tomorrow morning. Client review is at 11 AM." },
+  { title: "Schedule Q2 strategy meeting with Zomato", assignee: "Priya", deadline: "2026-05-16", priority: "High", source_platform: "email", source_group_name: "Zomato Strategy Thread", status: "confirmed", confidence: 87, source_message_text: "Can we schedule a meeting with the Zomato team this Friday to discuss Q2 strategy? Please confirm availability." },
+  { title: "Send performance report to Amazon", assignee: "Vikas", deadline: "2026-05-21", priority: "Low", source_platform: "email", source_group_name: "Amazon Monthly Reports", status: "unconfirmed", confidence: 83, source_message_text: "Vikas, please compile and send the monthly performance report for the Amazon account by next Tuesday." },
+  { title: "Prepare pitch deck for new Google campaign", assignee: "Rahul", deadline: "2026-05-22", priority: "Medium", source_platform: "slack", source_group_name: "Google Campaign", status: "unconfirmed", confidence: 76, source_message_text: "Bhai kal tak ek rough pitch deck banana hai Google ke naye campaign ke liye. Founder ko dikhana hai." }
+];
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !(session.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,9 +39,37 @@ export async function GET(req: NextRequest) {
       query = query.eq("user_id", userId);
     }
 
-    const { data: dbTasks, error } = await query.order("created_at", { ascending: false });
+    let { data: dbTasks, error } = await query.order("created_at", { ascending: false });
 
     if (error) throw error;
+
+    if (!dbTasks || dbTasks.length === 0) {
+      // Seed initial tasks into DB!
+      const company = profile?.company || "";
+      const seedData = SEED_TASKS.map(t => ({
+        user_id: userId,
+        company: company || null,
+        title: t.title,
+        assignee: t.assignee,
+        priority: t.priority,
+        deadline: t.deadline,
+        status: t.status,
+        confidence: t.confidence,
+        source_platform: t.source_platform,
+        source_group_name: t.source_group_name,
+        source_message_text: t.source_message_text,
+        source_message_id: "msg-" + Math.random().toString(36).substr(2, 9),
+      }));
+
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from("tasks")
+        .insert(seedData)
+        .select();
+
+      if (!insertErr && inserted) {
+        dbTasks = inserted;
+      }
+    }
 
     // Map Supabase tasks to front-end Task interface
     const mapped = (dbTasks || []).map((t: any) => {

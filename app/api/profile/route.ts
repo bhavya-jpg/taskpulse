@@ -69,6 +69,17 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
+    // Link any existing tasks seeded under this user_id to their company if they don't have one
+    try {
+      await supabaseAdmin
+        .from("tasks")
+        .update({ company })
+        .eq("user_id", userId)
+        .is("company", null);
+    } catch (e) {
+      console.error("Failed to link seeded tasks to company during profile upsert:", e);
+    }
+
     return NextResponse.json({ success: true, profile: data });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
