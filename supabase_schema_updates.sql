@@ -85,3 +85,10 @@ CREATE TABLE IF NOT EXISTS stakeholders (
 -- Disable RLS on the stakeholders table for collaborative testing simplicity
 ALTER TABLE stakeholders DISABLE ROW LEVEL SECURITY;
 
+
+-- ─── 8. UPDATE MEETINGS PLATFORM CHECK CONSTRAINT ─────────────────────────────
+-- Drop existing check constraint and add updated check constraint supporting Fathom platform.
+ALTER TABLE meetings DROP CONSTRAINT IF EXISTS meetings_platform_check;
+ALTER TABLE meetings ADD CONSTRAINT meetings_platform_check CHECK (platform IN ('google_meet', 'zoom', 'teams', 'manual', 'fathom'));
+
+

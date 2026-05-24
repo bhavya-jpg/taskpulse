@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       if (!result.alreadyExisted) {
         processed.push({
           id: result.meeting.id,
-          title: result.meeting.title,
+          title: (result.meeting as any).title || item.title || item.meeting_title || "Fathom Meeting",
           tasksCreated: result.tasksCreated
         });
       }

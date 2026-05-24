@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     const { data: employees, error: employeesError } = await supabaseAdmin
       .from("profiles")
       .select("id, name, email, designation, created_at")
-      .eq("company", userProfile.company)
+      .ilike("company", userProfile.company)
       .order("name", { ascending: true });
 
     if (employeesError) throw employeesError;

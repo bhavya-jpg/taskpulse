@@ -174,6 +174,7 @@ export function MeetingTab() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isFathomSyncing, setIsFathomSyncing] = useState(false);
+  const [fathomError, setFathomError] = useState<string | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -227,21 +228,22 @@ export function MeetingTab() {
 
   const handleFathomSync = async () => {
     setIsFathomSyncing(true);
+    setFathomError(null);
     try {
       const res = await fetch("/api/meetings/sync/fathom", { method: "POST" });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         if (data.processed && data.processed.length > 0) {
           fetchMeetings();
         } else {
           alert(data.message || "All Fathom meetings are already synced.");
         }
       } else {
-        alert(data.error || "Fathom sync failed");
+        setFathomError(data.error || "Fathom sync failed");
       }
     } catch (err) {
       console.error("Fathom sync error", err);
-      alert("Failed to sync Fathom meetings");
+      setFathomError("Failed to sync Fathom meetings");
     } finally {
       setIsFathomSyncing(false);
     }
@@ -280,6 +282,22 @@ export function MeetingTab() {
 
   return (
     <div className="space-y-6">
+      {fathomError && (
+        <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200/60 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl flex items-center justify-between text-xs font-semibold gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={14} className="text-rose-500 flex-shrink-0" />
+            <span>{fathomError}</span>
+          </div>
+          <button 
+            onClick={() => setFathomError(null)} 
+            className="text-rose-400 hover:text-rose-600 transition-colors p-1 bg-transparent border-none cursor-pointer flex items-center justify-center animate-pulse"
+            title="Dismiss error"
+          >
+            <Plus className="rotate-45" size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Video className="text-teal-600" /> AI Meeting Assistant
