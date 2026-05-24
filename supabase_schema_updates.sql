@@ -67,3 +67,21 @@ CREATE TABLE IF NOT EXISTS clients (
 -- Disable RLS on the clients table for collaborative testing simplicity
 ALTER TABLE clients DISABLE ROW LEVEL SECURITY;
 
+-- ─── 7. STAKEHOLDERS TABLE ──────────────────────────────────────────────────
+-- Stores stakeholders mapped to client accounts (people associated with tasks).
+-- Not a permission system — purely operational mapping.
+CREATE TABLE IF NOT EXISTS stakeholders (
+  id           text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  company      text NOT NULL,
+  client_name  text NOT NULL,
+  name         text NOT NULL,
+  email        text,
+  slack_id     text,
+  role         text NOT NULL,
+  category     text,
+  created_at   timestamptz DEFAULT now()
+);
+
+-- Disable RLS on the stakeholders table for collaborative testing simplicity
+ALTER TABLE stakeholders DISABLE ROW LEVEL SECURITY;
+

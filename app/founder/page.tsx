@@ -907,6 +907,42 @@ function DashboardView({
         </motion.div>
       )}
 
+      {/* Client Command Center Promo */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-white dark:bg-[#15171b] rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm overflow-hidden group"
+      >
+        <div className="relative p-5 md:p-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_20%,rgba(13,148,136,0.08),transparent_60%)] dark:bg-[radial-gradient(circle_at_90%_20%,rgba(13,148,136,0.12),transparent_60%)]" />
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-500/10 border border-teal-200/60 dark:border-teal-500/20 flex items-center justify-center flex-shrink-0">
+                <Briefcase size={18} className="text-teal-600 dark:text-teal-300" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-[15px]">Client Command Center</h3>
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-200 border border-teal-200/60 dark:border-teal-500/20 uppercase tracking-wider">New</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                  Manage all your client accounts as operational hubs. Track stakeholders, monitor project health, view task breakdowns per client, and see everything in one unified workspace.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/founder/clients"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all active:scale-[0.98] flex-shrink-0 no-underline"
+            >
+              <Briefcase size={13} />
+              Open Command Center
+              <ChevronRight size={13} />
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+
       <ManualTaskCreator onAddTask={onAddTask} tasks={tasks} employeesList={employeesList} />
 
       <div className="flex justify-between items-center bg-white dark:bg-[#15171b] p-3 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
