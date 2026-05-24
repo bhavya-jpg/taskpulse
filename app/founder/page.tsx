@@ -44,13 +44,14 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { SlackSetup, SlackStatusBadge } from "@/components/slack-setup";
 import { MeetingTab } from "@/components/MeetingTab";
+import { WhatsAppConnector, GroupSelector, useTaskStream } from "@/components/whatsapp-setup";
 import Link from "next/link";
 
 // Types
 
 type Priority = "High" | "Medium" | "Low";
 
-type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom";
+type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp";
 
 type Status = "pending" | "done";
 
@@ -2031,7 +2032,7 @@ function OnboardingPage({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your name"
-              className="w-full text-sm rounded-xl border border-slate-200/70 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full text-sm rounded-xl border border-slate-200/70 dark:border-slate-700/60 px-4 py-3 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             />
           </div>
 
@@ -2046,7 +2047,7 @@ function OnboardingPage({
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="e.g. Flipkart, Zomato, Google"
-              className="w-full text-sm rounded-xl border border-slate-200/70 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full text-sm rounded-xl border border-slate-200/70 dark:border-slate-700/60 px-4 py-3 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             />
             <div className="flex gap-2 pt-1 flex-wrap">
               {['Flipkart', 'Zomato', 'Amazon', 'Google'].map((tag) => (
@@ -2054,7 +2055,7 @@ function OnboardingPage({
                   key={tag}
                   type="button"
                   onClick={() => setCompany(tag)}
-                  className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                  className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   +{tag}
                 </button>
@@ -2075,20 +2076,20 @@ function OnboardingPage({
                 }}
                 className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
                   designation === "founder"
-                    ? "border-teal-500 bg-teal-50/70 shadow-sm"
-                    : "border-slate-200/70 bg-slate-50 hover:border-slate-300"
+                    ? "border-teal-500 bg-teal-50/70 dark:bg-teal-500/10 shadow-sm"
+                    : "border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] hover:border-slate-300 dark:hover:border-slate-500"
                 }`}
               >
                 <div className={`p-2.5 rounded-xl border transition-all ${
                   designation === "founder"
-                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600"
-                    : "bg-white border-slate-200/70 text-slate-400 group-hover:text-slate-700"
+                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-400"
+                    : "bg-white dark:bg-[#181a1f] border-slate-200/70 dark:border-slate-700/60 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200"
                 }`}>
                   <Crown size={16} />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-slate-800">Founder / Admin</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Full control over operations, billing, and task flows.</p>
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Founder / Admin</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Full control over operations, billing, and task flows.</p>
                 </div>
               </button>
 
@@ -2100,20 +2101,20 @@ function OnboardingPage({
                 }}
                 className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
                   designation === "employee"
-                    ? "border-teal-500 bg-teal-50/70 shadow-sm"
-                    : "border-slate-200/70 bg-slate-50 hover:border-slate-300"
+                    ? "border-teal-500 bg-teal-50/70 dark:bg-teal-500/10 shadow-sm"
+                    : "border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] hover:border-slate-300 dark:hover:border-slate-500"
                 }`}
               >
                 <div className={`p-2.5 rounded-xl border transition-all ${
                   designation === "employee"
-                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600"
-                    : "bg-white border-slate-200/70 text-slate-400 group-hover:text-slate-700"
+                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-400"
+                    : "bg-white dark:bg-[#181a1f] border-slate-200/70 dark:border-slate-700/60 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200"
                 }`}>
                   <User size={16} />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-slate-800">Employee / Staff</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Access assigned tasks and check off completed work.</p>
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Employee / Staff</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Access assigned tasks and check off completed work.</p>
                 </div>
               </button>
             </div>
@@ -2149,8 +2150,8 @@ function OnboardingPage({
                       value={securityKey}
                       onChange={(e) => setSecurityKey(e.target.value)}
                       placeholder="Enter security key to confirm designation"
-                      className={`w-full text-sm rounded-xl border px-4 py-3 pr-10 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all ${
-                        shaking ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200/70"
+                      className={`w-full text-sm rounded-xl border px-4 py-3 pr-10 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all ${
+                        shaking ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200/70 dark:border-slate-700/60"
                       }`}
                     />
                     <button
@@ -2264,10 +2265,15 @@ export default function FounderPage() {
         if (pRes.status === 200) {
           const pData = await pRes.json();
           if (pData && pData.profile) {
+            if (pData.profile.designation === "employee") {
+              router.push("/employee");
+              return;
+            }
             setOnboardingData(pData.profile);
             setOnboarded(true);
             localStorage.setItem("taskpulse_onboarding", JSON.stringify(pData.profile));
             setLoadingProfile(false);
+            loadEmployees();
             return;
           }
         }
@@ -2392,6 +2398,12 @@ export default function FounderPage() {
           <h2 className="text-xl font-semibold">Redirecting to Employee Console</h2>
           <p className="text-xs text-slate-500 leading-relaxed">
             Please wait while we route your authenticated session to the /employee workspace.
+            {(() => {
+              if (typeof window !== "undefined") {
+                setTimeout(() => router.push("/employee"), 500);
+              }
+              return null;
+            })()}
           </p>
           <button
             onClick={() => {
@@ -2709,7 +2721,7 @@ export default function FounderPage() {
               <SlackSetup
                 onToast={addToast}
                 loadTasks={loadTasks}
-                setActiveTab={setActiveTab}
+                setActiveTab={(tab: string) => setActiveTab(tab as Tab)}
               />
             )}
 

@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
       .from("profiles")
       .upsert({
         id: userId,
-        name,
-        email,
-        company,
+        name: name.trim(),
+        email: email.trim(),
+        company: company.trim(),
         designation,
       })
       .select()
