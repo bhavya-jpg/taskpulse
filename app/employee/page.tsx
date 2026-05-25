@@ -480,7 +480,7 @@ function TaskCard({
               exit={{ opacity: 0, height: 0 }}
               className="bg-amber-50/70 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 rounded-xl p-3 flex flex-col gap-2 overflow-hidden"
             >
-              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-200 uppercase tracking-wider">Describe the blocker</span>
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-200 uppercase tracking-wider">{!isFounder ? "Write a short note for the founder" : "Describe the blocker"}</span>
               <textarea
                 value={tempNote}
                 onChange={(e) => setTempNote(e.target.value)}
@@ -504,7 +504,7 @@ function TaskCard({
                   }}
                   className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-semibold rounded-md shadow-sm cursor-pointer border-none"
                 >
-                  Raise Blocker
+                  {!isFounder ? "Send Note" : "Raise Blocker"}
                 </button>
               </div>
             </motion.div>
@@ -564,13 +564,18 @@ function TaskCard({
                         setShowBlockerModal(true);
                       }
                     }}
-                    className={`w-full text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border cursor-pointer ${
+                    disabled={!isFounder && task.isBlocked}
+                    className={`w-full text-[11px] font-semibold rounded-lg py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] border ${
+                      !isFounder && task.isBlocked ? "opacity-70 cursor-not-allowed" : "cursor-pointer"
+                    } ${
                       task.isBlocked
                         ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30"
                         : "bg-white dark:bg-[#15171b] hover:bg-amber-50/60 dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 border-slate-200/70 dark:border-slate-700/60 dark:hover:border-amber-500/30"
                     }`}
                   >
-                    {task.isBlocked ? "Resolve blocker" : "Report blocker"}
+                    {task.isBlocked 
+                      ? (!isFounder ? "Note sent to Founder" : "Resolve Note/Blocker") 
+                      : (!isFounder ? "Ask / Request Review" : "Report blocker")}
                   </button>
                 )}
               </div>
@@ -700,43 +705,8 @@ function DashboardView({
         </div>
       </div>
 
-      {/* 3-Column Kanban Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Column 1: Needs Review */}
-        <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
-          <div className="flex flex-col gap-1 px-1">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-500" />
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">Needs Review</h3>
-              </div>
-              <span className="bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-200 text-[10px] font-semibold rounded-full px-2.5 py-1 border border-amber-200/60 dark:border-amber-500/30 shadow-sm">{unconfirmed.length}</span>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Imported tasks (Slack/Email) that you need to confirm or reject.</p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <AnimatePresence>
-              {unconfirmed.length === 0 ? (
-                <EmptyState message="All suggestions reviewed." />
-              ) : (
-                unconfirmed.map((t) => (
-                  <TaskCard
-                    key={t.id}
-                    task={t}
-                    showConfirmButtons
-                    onConfirm={onConfirm}
-                    onDismiss={onDismiss}
-                    isFounder={false}
-                    onUpdateTask={onUpdateTask}
-                    employeesList={employeesList}
-                  />
-                ))
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
+      {/* 2-Column Kanban Board */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Column 2: Active Tasks */}
         <div className="bg-slate-50 dark:bg-[#15171b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] rounded-2xl p-4 flex flex-col gap-4 border border-slate-200/70 dark:border-slate-700/60 min-h-[500px]">
           <div className="flex flex-col gap-1 px-1">
@@ -761,9 +731,7 @@ function DashboardView({
                     task={t}
                     onMarkDone={onMarkDone}
                     isFounder={false}
-                    onSendToReview={onSendToReview}
                     onToggleBlocker={onToggleBlocker}
-                    onUpdateTask={onUpdateTask}
                     employeesList={employeesList}
                   />
                 ))
@@ -795,8 +763,6 @@ function DashboardView({
                     key={t.id}
                     task={t}
                     isFounder={false}
-                    onMarkActive={onMarkActive}
-                    onUpdateTask={onUpdateTask}
                     employeesList={employeesList}
                   />
                 ))
@@ -938,14 +904,8 @@ function ClientView({
                               <TaskCard
                                 key={t.id}
                                 task={t}
-                                showConfirmButtons={t.confidence < 85 && t.status !== "done" && t.status !== "dismissed"}
-                                onConfirm={onConfirm}
-                                onDismiss={onDismiss}
                                 onMarkDone={onMarkDone}
                                 onToggleBlocker={onToggleBlocker}
-                                onSendToReview={onSendToReview}
-                                onMarkActive={onMarkActive}
-                                onUpdateTask={onUpdateTask}
                                 isFounder={false}
                                 employeesList={employeesList}
                               />
@@ -1459,7 +1419,7 @@ export default function EmployeeDashboard() {
       loadProfileAndTasks();
       loadEmployees();
     } else if (status === "unauthenticated") {
-      router.push("/");
+      router.push("/login");
     }
   }, [status, session]);
 

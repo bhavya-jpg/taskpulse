@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -163,8 +163,8 @@ export default function LandingPage() {
   const isAuthed = status === "authenticated";
 
   const primaryCta = isAuthed
-    ? { label: "Open dashboard", href: "/founder" }
-    : { label: "Get started", action: () => signIn("google", { callbackUrl: "/founder" }) };
+    ? { label: "Open dashboard", href: "/login" }
+    : { label: "Get started", href: "/login" };
   const secondaryCta = isAuthed
     ? { label: "View product tour", href: "#showcase" }
     : { label: "View demo", href: "#showcase" };
@@ -196,20 +196,20 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               {isAuthed ? (
                 <Link
-                  href="/founder"
+                  href="/login"
                   className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 px-3 py-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80 hover:border-teal-500/60 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   Dashboard
                   <ArrowRight size={16} />
                 </Link>
               ) : (
-                <button
-                  onClick={() => signIn("google", { callbackUrl: "/founder" })}
+                <Link
+                  href="/login"
                   className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 px-3 py-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80 hover:border-teal-500/60 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   Login
                   <ArrowRight size={16} />
-                </button>
+                </Link>
               )}
               <Link
                 href="#pricing"
@@ -551,37 +551,37 @@ export default function LandingPage() {
               {plan.highlighted ? (
                 isAuthed ? (
                   <Link
-                    href="/founder"
+                    href="/login"
                     className="mt-6 inline-flex items-center justify-center w-full gap-2 bg-white text-teal-700 font-semibold px-4 py-3 rounded-xl"
                   >
                     Open dashboard
                     <ArrowRight size={16} />
                   </Link>
                 ) : (
-                  <button
-                    onClick={() => signIn("google")}
+                  <Link
+                    href="/login"
                     className="mt-6 inline-flex items-center justify-center w-full gap-2 bg-white text-teal-700 font-semibold px-4 py-3 rounded-xl"
                   >
                     Start now
                     <ArrowRight size={16} />
-                  </button>
+                  </Link>
                 )
               ) : isAuthed ? (
                 <Link
-                  href="/founder"
+                  href="/login"
                   className="mt-6 inline-flex items-center justify-center w-full gap-2 border border-slate-200/80 dark:border-slate-700/70 text-slate-700 dark:text-slate-200 font-semibold px-4 py-3 rounded-xl"
                 >
                   Open dashboard
                   <ArrowRight size={16} />
                 </Link>
               ) : (
-                <button
-                  onClick={() => signIn("google")}
+                <Link
+                  href="/login"
                   className="mt-6 inline-flex items-center justify-center w-full gap-2 border border-slate-200/80 dark:border-slate-700/70 text-slate-700 dark:text-slate-200 font-semibold px-4 py-3 rounded-xl"
                 >
                   Start now
                   <ArrowRight size={16} />
-                </button>
+                </Link>
               )}
             </div>
           ))}
@@ -637,20 +637,20 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center gap-3">
             {isAuthed ? (
               <Link
-                href="/founder"
+                href="/login"
                 className="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-5 py-3 rounded-xl"
               >
                 Open dashboard
                 <ArrowRight size={16} />
               </Link>
             ) : (
-              <button
-                onClick={() => signIn("google")}
+              <Link
+                href="/login"
                 className="inline-flex items-center gap-2 bg-white text-teal-700 font-semibold px-5 py-3 rounded-xl"
               >
                 Get started
                 <ArrowRight size={16} />
-              </button>
+              </Link>
             )}
             <Link
               href="#showcase"

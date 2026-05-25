@@ -2316,6 +2316,7 @@ export default function FounderPage() {
     } else if (status === "unauthenticated") {
       setOnboarded(false);
       setLoadingProfile(false);
+      router.push("/login");
     }
   }, [status, session]);
 
@@ -2358,7 +2359,7 @@ export default function FounderPage() {
   }
 
   if (!session) {
-    return <LoginPage onSignIn={() => signIn("google", { callbackUrl: "/founder" })} />;
+    return null;
   }
 
   if (!onboarded) {
