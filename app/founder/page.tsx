@@ -409,7 +409,7 @@ function TaskCard({
         </div>
 
         {/* Task Title */}
-        <h4 className={`text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-150 leading-snug ${
+        <h4 className={`text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-snug ${
           task.status === "done" ? "line-through text-slate-400 dark:text-slate-500" : ""
         }`}>
           {task.title}
@@ -433,15 +433,20 @@ function TaskCard({
               <User size={10} className="text-teal-600 dark:text-teal-300" />
             </div>
             {isFounder && onReassign ? (
-              <select
-                value={task.assignedTo}
-                onChange={(e) => onReassign?.(task.id, e.target.value)}
-                className="bg-transparent border-0 rounded-lg py-0.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-1 focus:ring-teal-500 font-semibold cursor-pointer transition-colors"
-              >
-                {activeEmployees.map((emp) => (
-                  <option key={emp} value={emp}>{emp}</option>
-                ))}
-              </select>
+              <div className="relative flex items-center bg-teal-50/50 hover:bg-teal-50/80 dark:bg-teal-500/10 dark:hover:bg-teal-500/15 border border-teal-200/50 dark:border-teal-500/20 rounded-lg px-2 py-0.5 transition-colors cursor-pointer">
+                <select
+                  value={task.assignedTo}
+                  onChange={(e) => onReassign?.(task.id, e.target.value)}
+                  className="appearance-none bg-transparent border-0 text-[11px] text-teal-800 dark:text-teal-350 pr-4 outline-none font-bold cursor-pointer"
+                >
+                  {activeEmployees.map((emp) => (
+                    <option key={emp} value={emp} className="bg-white dark:bg-[#13151a] text-slate-800 dark:text-slate-200 font-semibold">
+                      {emp}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={10} className="text-teal-600 dark:text-teal-400 absolute right-1.5 pointer-events-none" />
+              </div>
             ) : (
               <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
             )}
@@ -2036,7 +2041,7 @@ function OnboardingPage({
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label htmlFor="full-name" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label htmlFor="full-name" className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <User size={12} className="text-teal-500" /> Full Name
             </label>
             <input
@@ -2046,12 +2051,12 @@ function OnboardingPage({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your name"
-              className="w-full text-sm rounded-xl border border-slate-200/70 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full text-sm rounded-xl border border-slate-200/70 dark:border-slate-700/60 px-4 py-3 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="company-name" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label htmlFor="company-name" className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <Briefcase size={12} className="text-teal-500" /> Company Name
             </label>
             <input
@@ -2061,7 +2066,7 @@ function OnboardingPage({
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="e.g. Flipkart, Zomato, Google"
-              className="w-full text-sm rounded-xl border border-slate-200/70 px-4 py-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full text-sm rounded-xl border border-slate-200/70 dark:border-slate-700/60 px-4 py-3 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             />
             <div className="flex gap-2 pt-1 flex-wrap">
               {['Flipkart', 'Zomato', 'Amazon', 'Google'].map((tag) => (
@@ -2069,7 +2074,7 @@ function OnboardingPage({
                   key={tag}
                   type="button"
                   onClick={() => setCompany(tag)}
-                  className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 bg-slate-50 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                  className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   +{tag}
                 </button>
@@ -2078,7 +2083,7 @@ function OnboardingPage({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <Crown size={12} className="text-teal-500" /> Choose Designation
             </label>
             <div className="grid grid-cols-2 gap-4">
@@ -2090,20 +2095,20 @@ function OnboardingPage({
                 }}
                 className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
                   designation === "founder"
-                    ? "border-teal-500 bg-teal-50/70 shadow-sm"
-                    : "border-slate-200/70 bg-slate-50 hover:border-slate-300"
+                    ? "border-teal-500 bg-teal-50/70 dark:bg-teal-500/10 shadow-sm"
+                    : "border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
                 <div className={`p-2.5 rounded-xl border transition-all ${
                   designation === "founder"
-                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600"
-                    : "bg-white border-slate-200/70 text-slate-400 group-hover:text-slate-700"
+                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-400"
+                    : "bg-white dark:bg-[#1a1c23] border-slate-200/70 dark:border-slate-700/60 text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300"
                 }`}>
                   <Crown size={16} />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-slate-800">Founder / Admin</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Full control over operations, billing, and task flows.</p>
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Founder / Admin</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Full control over operations, billing, and task flows.</p>
                 </div>
               </button>
 
@@ -2115,20 +2120,20 @@ function OnboardingPage({
                 }}
                 className={`text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 group ${
                   designation === "employee"
-                    ? "border-teal-500 bg-teal-50/70 shadow-sm"
-                    : "border-slate-200/70 bg-slate-50 hover:border-slate-300"
+                    ? "border-teal-500 bg-teal-50/70 dark:bg-teal-500/10 shadow-sm"
+                    : "border-slate-200/70 dark:border-slate-700/60 bg-slate-50 dark:bg-[#121316] hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
                 <div className={`p-2.5 rounded-xl border transition-all ${
                   designation === "employee"
-                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600"
-                    : "bg-white border-slate-200/70 text-slate-400 group-hover:text-slate-700"
+                    ? "bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-400"
+                    : "bg-white dark:bg-[#1a1c23] border-slate-200/70 dark:border-slate-700/60 text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300"
                 }`}>
                   <User size={16} />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-slate-800">Employee / Staff</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Access assigned tasks and check off completed work.</p>
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Employee / Staff</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Access assigned tasks and check off completed work.</p>
                 </div>
               </button>
             </div>
@@ -2145,10 +2150,10 @@ function OnboardingPage({
               >
                 <div className="pt-2 space-y-2">
                   <div className="flex justify-between items-center">
-                    <label htmlFor="security-key" className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                    <label htmlFor="security-key" className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                       <Lock size={12} className="text-amber-500" /> Founder Security Password
                     </label>
-                    <span className="text-[10px] text-teal-600 font-semibold bg-teal-50 px-2 py-0.5 rounded-full" title="Hint for reviewer">
+                    <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-200/40 dark:border-teal-500/20" title="Hint for reviewer">
                       Reviewer hint: Use "admin123"
                     </span>
                   </div>
@@ -2164,14 +2169,14 @@ function OnboardingPage({
                       value={securityKey}
                       onChange={(e) => setSecurityKey(e.target.value)}
                       placeholder="Enter security key to confirm designation"
-                      className={`w-full text-sm rounded-xl border px-4 py-3 pr-10 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all ${
-                        shaking ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200/70"
+                      className={`w-full text-sm rounded-xl border px-4 py-3 pr-10 bg-slate-50 dark:bg-[#121316] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all ${
+                        shaking ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200/70 dark:border-slate-700/60"
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-0 outline-none"
+                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer bg-transparent border-0 outline-none"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>

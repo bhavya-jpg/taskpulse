@@ -391,7 +391,7 @@ function TaskCard({
         </div>
 
         {/* Task Title */}
-        <h4 className={`text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-150 leading-snug ${
+        <h4 className={`text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-snug ${
           task.status === "done" ? "line-through text-slate-400 dark:text-slate-500" : ""
         }`}>
           {task.title}
