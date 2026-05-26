@@ -437,7 +437,7 @@ function TaskCard({
                 <select
                   value={task.assignedTo}
                   onChange={(e) => onReassign?.(task.id, e.target.value)}
-                  className="appearance-none bg-transparent border-0 text-[11px] text-teal-800 dark:text-teal-350 pr-4 outline-none font-bold cursor-pointer"
+                  className="appearance-none bg-transparent border-0 text-[11px] text-teal-800 dark:text-white pr-4 outline-none font-bold cursor-pointer"
                 >
                   {activeEmployees.map((emp) => (
                     <option key={emp} value={emp} className="bg-white dark:bg-[#13151a] text-slate-800 dark:text-slate-200 font-semibold">
@@ -448,7 +448,7 @@ function TaskCard({
                 <ChevronDown size={10} className="text-teal-600 dark:text-teal-400 absolute right-1.5 pointer-events-none" />
               </div>
             ) : (
-              <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
+              <span className="font-semibold text-slate-700 dark:text-white">{task.assignedTo}</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">

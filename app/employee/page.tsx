@@ -425,7 +425,7 @@ function TaskCard({
                 ))}
               </select>
             ) : (
-              <span className="font-semibold text-slate-700 dark:text-slate-200">{task.assignedTo}</span>
+              <span className="font-semibold text-slate-700 dark:text-white">{task.assignedTo}</span>
             )}
           </div>
           <div className="flex items-center gap-1.5">
