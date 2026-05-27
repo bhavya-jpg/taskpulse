@@ -46,14 +46,21 @@ RESPOND ONLY WITH VALID JSON.`;
 
 export async function analyzeMeetingTranscript(
   transcript: string,
-  meetingMeta: { title: string; date: string; participants: string[] }
+  meetingMeta: { title: string; date: string; participants: string[]; meetingType?: string; clientName?: string }
 ): Promise<MeetingAnalysis> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  let contextAddon = "";
+  if (meetingMeta.meetingType === 'client' || meetingMeta.meetingType === 'internal_client') {
+    contextAddon = `\nContext: This is a ${meetingMeta.meetingType === 'client' ? 'client meeting' : 'internal client discussion'} regarding ${meetingMeta.clientName}. Please tailor tasks appropriately.`;
+  } else if (meetingMeta.meetingType === 'normal') {
+    contextAddon = `\nContext: This is a normal internal team meeting.`;
+  }
 
   const userPrompt = `
 Meeting Title: ${meetingMeta.title}
 Meeting Date: ${meetingMeta.date}
-Participants: ${meetingMeta.participants.join(", ")}
+Participants: ${meetingMeta.participants.join(", ")}${contextAddon}
 
 Transcript:
 """
@@ -81,7 +88,7 @@ export async function processMeetingTasks(
   userId: string,
   meetingId: string,
   analysis: MeetingAnalysis,
-  meetingMeta: { title: string; date: string; platform: string }
+  meetingMeta: { title: string; date: string; platform: string; meetingType?: string; clientName?: string }
 ) {
   // Fetch current user's profile to resolve company
   const { data: profile } = await supabaseAdmin
@@ -94,6 +101,13 @@ export async function processMeetingTasks(
   const createdTasks = [];
 
   for (const item of analysis.action_items) {
+    let sourceGroupName = meetingMeta.title;
+    if (meetingMeta.meetingType === 'client' || meetingMeta.meetingType === 'internal_client') {
+      sourceGroupName = meetingMeta.clientName ? `${meetingMeta.clientName} Campaign` : meetingMeta.title;
+    } else if (meetingMeta.meetingType === 'normal') {
+      sourceGroupName = 'Internal Task';
+    }
+
     const task = {
       user_id: userId,
       company,
@@ -104,7 +118,7 @@ export async function processMeetingTasks(
       confidence: 100, // Direct extraction from meeting is usually high confidence
       status: "unconfirmed",
       source_platform: meetingMeta.platform,
-      source_group_name: meetingMeta.title,
+      source_group_name: sourceGroupName,
       source_message_text: item.source_quote,
       source_timestamp: meetingMeta.date,
       meeting_id: meetingId,

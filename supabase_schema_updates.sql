@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS slack_messages (
 -- Allows tasks and meetings to be shared across employees of the same company.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS company text;
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS company text;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS event_id text;
 
 -- ─── 5. DISABLE RLS ON NEW TABLES FOR DEV/DEMO COLLABORATIVE SIMPLICITY ──────
 -- Ensures that different laptops/clients can query and update shared tables without restriction.

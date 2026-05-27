@@ -2,7 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Video, FileText, Upload, Plus, Calendar, User, CheckCircle2, AlertCircle, Loader2, ChevronDown, ChevronUp, RefreshCw, Sparkles } from "lucide-react";
+import { Video, FileText, Upload, Plus, Calendar as CalendarIcon, User, CheckCircle2, AlertCircle, Loader2, ChevronDown, ChevronUp, RefreshCw, Sparkles, List } from "lucide-react";
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import format from 'date-fns/format';
+import parse from 'date-fns/parse';
+import startOfWeek from 'date-fns/startOfWeek';
+import getDay from 'date-fns/getDay';
+import enUS from 'date-fns/locale/en-US';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+const locales = {
+  'en-US': enUS,
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
 interface Meeting {
   id: string;
@@ -177,6 +196,11 @@ export function MeetingTab() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'list' | 'calendar'>('list');
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   
   const [uploadData, setUploadData] = useState({
     title: "",
@@ -200,8 +224,41 @@ export function MeetingTab() {
     }
   };
 
+  const fetchCalendarEvents = async () => {
+    setCalendarError(null);
+    try {
+      const res = await fetch("/api/meetings/calendar");
+      const data = await res.json();
+      if (res.ok && data.success && data.events) {
+        const formatted = data.events.map((ev: any) => ({
+          ...ev,
+          start: new Date(ev.start),
+          end: new Date(ev.end || ev.start),
+        }));
+        setCalendarEvents(formatted);
+      } else {
+        setCalendarError(data.error || "Failed to fetch calendar events.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch calendar events", err);
+      setCalendarError("Connection error. Failed to reach server.");
+    }
+  };
+
+  const handleCalendarSync = async () => {
+    setIsSyncingCalendar(true);
+    try {
+      await fetchCalendarEvents();
+    } catch (err) {
+      console.error("Calendar sync error", err);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
   useEffect(() => {
     fetchMeetings();
+    fetchCalendarEvents();
   }, []);
 
   const handleGoogleSync = async () => {
@@ -256,6 +313,12 @@ export function MeetingTab() {
     formData.append("platform", uploadData.platform);
     formData.append("date", uploadData.date);
     formData.append("participants", uploadData.participants);
+    
+    // Add extra meta info if coming from calendar
+    if ((uploadData as any).id) formData.append("eventId", (uploadData as any).id);
+    if ((uploadData as any).meetingType) formData.append("meetingType", (uploadData as any).meetingType);
+    if ((uploadData as any).clientName) formData.append("clientName", (uploadData as any).clientName);
+
     if (uploadData.transcript) {
       formData.append("transcript", uploadData.transcript);
     }
@@ -302,7 +365,15 @@ export function MeetingTab() {
             Sync Fathom
           </button>
           <button
-            onClick={() => setIsUploading(true)}
+            onClick={() => {
+              setUploadData({
+                ...uploadData,
+                title: "",
+                platform: "manual",
+                date: new Date().toISOString().split('T')[0],
+              });
+              setIsUploading(true);
+            }}
             className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors transition-transform active:scale-95"
           >
             <Plus size={16} /> New Meeting Post
@@ -383,6 +454,29 @@ export function MeetingTab() {
 
         {/* Right Side: Main Content */}
         <div className="space-y-6 w-full">
+          <div className="flex bg-slate-100 dark:bg-[#15171b] p-1 rounded-xl w-fit border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
+            <button
+              onClick={() => setActiveTab('list')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === 'list' 
+                  ? 'bg-white dark:bg-[#1e2025] text-slate-800 dark:text-slate-100 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <List size={16} /> Processed List
+            </button>
+            <button
+              onClick={() => setActiveTab('calendar')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === 'calendar' 
+                  ? 'bg-white dark:bg-[#1e2025] text-slate-800 dark:text-slate-100 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <CalendarIcon size={16} /> Calendar View
+            </button>
+          </div>
+
           {isUploading && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -476,7 +570,344 @@ export function MeetingTab() {
             </motion.div>
           )}
 
+          {/* Calendar View */}
+          {activeTab === 'calendar' && (
+            <div className="bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-2xl p-6 shadow-sm h-[650px] flex flex-col relative">
+              {/* Custom CSS overrides for React Big Calendar to support beautiful dark mode */}
+              <style dangerouslySetInnerHTML={{ __html: `
+                .rbc-calendar {
+                  font-family: inherit;
+                }
+                .rbc-toolbar {
+                  margin-bottom: 16px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  flex-wrap: wrap;
+                  gap: 8px;
+                }
+                .rbc-toolbar .rbc-toolbar-label {
+                  font-weight: 700;
+                  font-size: 1.1rem;
+                  color: #1e293b;
+                }
+                .dark .rbc-toolbar .rbc-toolbar-label {
+                  color: #f8fafc;
+                }
+                .rbc-btn-group button {
+                  font-weight: 600 !important;
+                  font-size: 0.8rem !important;
+                  padding: 6px 12px !important;
+                  border-radius: 8px !important;
+                  border: 1px solid #e2e8f0 !important;
+                  background-color: #ffffff !important;
+                  color: #475569 !important;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                }
+                .rbc-btn-group button:hover {
+                  background-color: #f8fafc !important;
+                  color: #0f766e !important;
+                  border-color: #cbd5e1 !important;
+                }
+                .rbc-btn-group button.rbc-active {
+                  background-color: #0f766e !important;
+                  color: #ffffff !important;
+                  border-color: #0f766e !important;
+                  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+                }
+                .rbc-btn-group button:first-child {
+                  border-top-right-radius: 0 !important;
+                  border-bottom-right-radius: 0 !important;
+                }
+                .rbc-btn-group button:last-child {
+                  border-top-left-radius: 0 !important;
+                  border-bottom-left-radius: 0 !important;
+                }
+                .rbc-btn-group button:not(:first-child):not(:last-child) {
+                  border-radius: 0 !important;
+                }
+
+                .rbc-month-view {
+                  border-radius: 12px !important;
+                  overflow: hidden;
+                  border: 1px solid #e2e8f0 !important;
+                }
+                .rbc-month-row {
+                  border-top: 1px solid #e2e8f0 !important;
+                }
+                .rbc-day-bg {
+                  border-left: 1px solid #e2e8f0 !important;
+                  transition: background-color 0.2s ease;
+                }
+                .rbc-day-bg:hover {
+                  background-color: rgba(15, 118, 110, 0.02);
+                }
+                .rbc-header {
+                  border-bottom: 1px solid #e2e8f0 !important;
+                  font-weight: 700 !important;
+                  text-transform: uppercase;
+                  font-size: 0.7rem !important;
+                  letter-spacing: 0.05em;
+                  color: #64748b;
+                  padding: 10px 0 !important;
+                  background-color: #f8fafc;
+                }
+                .rbc-header + .rbc-header {
+                  border-left: 1px solid #e2e8f0 !important;
+                }
+                .rbc-off-range-bg {
+                  background-color: #f8fafc !important;
+                }
+                .rbc-today {
+                  background-color: rgba(15, 118, 110, 0.04) !important;
+                }
+
+                .rbc-event {
+                  transition: all 0.2s ease;
+                  font-weight: 600 !important;
+                  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.04);
+                }
+                .rbc-event:hover {
+                  transform: translateY(-1px);
+                  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                  filter: brightness(1.08);
+                }
+
+                .rbc-time-view {
+                  border-radius: 12px !important;
+                  overflow: hidden;
+                  border: 1px solid #e2e8f0 !important;
+                }
+                .rbc-time-header {
+                  border-bottom: 1px solid #e2e8f0 !important;
+                }
+                .rbc-time-header-content {
+                  border-left: 1px solid #e2e8f0 !important;
+                }
+                .rbc-time-content {
+                  border-top: 1px solid #e2e8f0 !important;
+                }
+                .rbc-time-gutter {
+                  background-color: #f8fafc;
+                }
+                .rbc-timeslot-group {
+                  border-bottom: 1px solid #f1f5f9 !important;
+                }
+                .rbc-day-slot .rbc-time-slot {
+                  border-top: 1px solid #f1f5f9 !important;
+                }
+
+                /* DARK MODE OVERRIDES */
+                .dark .rbc-month-view,
+                .dark .rbc-time-view {
+                  border-color: #27272a !important;
+                  background-color: #15171b !important;
+                }
+                .dark .rbc-month-row {
+                  border-top: 1px solid #27272a !important;
+                }
+                .dark .rbc-day-bg {
+                  border-left: 1px solid #27272a !important;
+                }
+                .dark .rbc-day-bg:hover {
+                  background-color: rgba(20, 184, 166, 0.02) !important;
+                }
+                .dark .rbc-header {
+                  border-bottom: 1px solid #27272a !important;
+                  background-color: #121316 !important;
+                  color: #a1a1aa !important;
+                }
+                .dark .rbc-header + .rbc-header {
+                  border-left: 1px solid #27272a !important;
+                }
+                .dark .rbc-off-range-bg {
+                  background-color: #1c1d22 !important;
+                }
+                .dark .rbc-today {
+                  background-color: rgba(20, 184, 166, 0.08) !important;
+                }
+                .dark .rbc-btn-group button {
+                  background-color: #1c1d22 !important;
+                  color: #a1a1aa !important;
+                  border-color: #27272a !important;
+                }
+                .dark .rbc-btn-group button:hover {
+                  background-color: #27272a !important;
+                  color: #2dd4bf !important;
+                  border-color: #3f3f46 !important;
+                }
+                .dark .rbc-btn-group button.rbc-active {
+                  background-color: #0f766e !important;
+                  color: #ffffff !important;
+                  border-color: #0f766e !important;
+                }
+                .dark .rbc-time-header {
+                  border-bottom: 1px solid #27272a !important;
+                }
+                .dark .rbc-time-header-content {
+                  border-left: 1px solid #27272a !important;
+                }
+                .dark .rbc-time-content {
+                  border-top: 1px solid #27272a !important;
+                }
+                .dark .rbc-time-gutter {
+                  background-color: #121316 !important;
+                  border-right: 1px solid #27272a !important;
+                }
+                .dark .rbc-timeslot-group {
+                  border-bottom: 1px solid #27272a !important;
+                }
+                .dark .rbc-day-slot .rbc-time-slot {
+                  border-top: 1px solid #27272a !important;
+                }
+                .dark .rbc-show-more {
+                  color: #2dd4bf !important;
+                }
+                .dark .rbc-show-more:hover {
+                  color: #5eead4 !important;
+                }
+              ` }} />
+
+              <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                <div>
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <CalendarIcon className="text-teal-600 dark:text-teal-400" size={18} />
+                    Founder Calendar Sync
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Synced with your primary Google Calendar event tags (e.g. <code className="bg-slate-100 dark:bg-slate-800/60 px-1 py-0.5 rounded text-teal-600 dark:text-teal-400 font-semibold font-mono">#client</code>, <code className="bg-slate-100 dark:bg-slate-800/60 px-1 py-0.5 rounded text-teal-600 dark:text-teal-400 font-semibold font-mono">#internal_client</code>).
+                  </p>
+                </div>
+                <button
+                  onClick={handleCalendarSync}
+                  disabled={isSyncingCalendar}
+                  className="bg-white dark:bg-[#1e2025] hover:bg-slate-50 dark:hover:bg-slate-700/40 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSyncingCalendar ? (
+                    <Loader2 size={13} className="animate-spin text-teal-600 dark:text-teal-400" />
+                  ) : (
+                    <RefreshCw size={13} className="text-teal-600 dark:text-teal-400" />
+                  )}
+                  Sync Calendar
+                </button>
+              </div>
+
+              {calendarError && (
+                <div className="mb-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-4 flex gap-3 text-xs text-red-900 dark:text-red-200 font-medium">
+                  <AlertCircle className="flex-shrink-0 text-red-600 dark:text-red-400" size={16} />
+                  <div>
+                    <p className="font-semibold">{calendarError}</p>
+                    {(calendarError.toLowerCase().includes("token") || calendarError.toLowerCase().includes("auth") || calendarError.toLowerCase().includes("permission") || calendarError.toLowerCase().includes("scope") || calendarError.toLowerCase().includes("unauthorized")) && (
+                      <p className="mt-1 opacity-90 leading-relaxed font-normal">
+                        This usually happens if your Google login session doesn't have the Google Calendar scope. Please <strong>Log Out</strong> from the dashboard and <strong>Log Back In</strong> to grant the Google Calendar access permissions.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <Calendar
+                localizer={localizer}
+                events={calendarEvents}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ flex: 1 }}
+                className="font-sans text-sm dark:text-slate-300"
+                onSelectEvent={(event) => setSelectedEvent(event)}
+                eventPropGetter={(event) => {
+                  let backgroundColor = '#0f766e'; // teal-700 default
+                  if (event.isProcessed) {
+                    backgroundColor = '#64748b'; // slate-500 if processed
+                  } else if (event.meetingType === 'client') {
+                    backgroundColor = '#0369a1'; // sky-700 for client
+                  } else if (event.meetingType === 'internal_client') {
+                    backgroundColor = '#4338ca'; // indigo-700
+                  }
+                  return { style: { backgroundColor, borderRadius: '6px', border: 'none', padding: '3px 6px', fontSize: '12px', color: '#ffffff' } };
+                }}
+              />
+            </div>
+          )}
+
+          {/* Event Details Popover/Modal */}
+          {selectedEvent && activeTab === 'calendar' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              onClick={() => setSelectedEvent(null)}
+            >
+              <div 
+                className="bg-white dark:bg-[#15171b] w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{selectedEvent.title}</h3>
+                    <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+                      <Plus className="rotate-45" size={24} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <CalendarIcon size={16} /> 
+                      {format(selectedEvent.start, 'MMM d, yyyy h:mm a')}
+                    </div>
+                    
+                    {selectedEvent.meetingType && (
+                      <div className="flex gap-2 items-center">
+                        <span className="text-xs font-semibold uppercase text-slate-500">Type:</span>
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-1 rounded text-xs font-semibold">
+                          {selectedEvent.meetingType.replace('_', ' ')}
+                        </span>
+                        {selectedEvent.clientName && (
+                          <span className="bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2 py-1 rounded text-xs font-semibold">
+                            {selectedEvent.clientName}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="bg-slate-50 dark:bg-[#121316] p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-40 overflow-y-auto border border-slate-100 dark:border-slate-800/60">
+                      {selectedEvent.description || "No description provided."}
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex justify-end">
+                      {selectedEvent.isProcessed ? (
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-semibold bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-lg">
+                          <CheckCircle2 size={16} className="text-emerald-500" /> Already Processed
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setUploadData({
+                              ...uploadData,
+                              title: selectedEvent.title,
+                              date: selectedEvent.start.toISOString().split('T')[0],
+                              platform: selectedEvent.platform || "manual",
+                              // Pass the meta info to form
+                              ...(selectedEvent as any)
+                            });
+                            setIsUploading(true);
+                            setSelectedEvent(null);
+                            setActiveTab('list');
+                          }}
+                          className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                          <Upload size={16} /> Process Transcript for this Event
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Meetings List */}
+          {activeTab === 'list' && (
           <div className="space-y-4">
             {loading ? (
               <div className="flex justify-center py-10">
@@ -504,7 +935,7 @@ export function MeetingTab() {
                       <div>
                         <h3 className="font-semibold text-slate-800 dark:text-slate-100">{meeting.title}</h3>
                         <div className="flex items-center gap-3 text-xs text-slate-500">
-                          <span className="flex items-center gap-1 font-semibold"><Calendar size={12} /> {new Date(meeting.meeting_date).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1 font-semibold"><CalendarIcon size={12} /> {new Date(meeting.meeting_date).toLocaleDateString()}</span>
                           <span className="uppercase font-semibold">{meeting.platform.replace('_', ' ')}</span>
                         </div>
                       </div>
@@ -575,6 +1006,7 @@ export function MeetingTab() {
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

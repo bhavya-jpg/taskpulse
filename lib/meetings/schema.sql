@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS meetings (
   raw_transcript       text,
   key_topics           text[],
   decisions            jsonb,
+  event_id             text,
   processed_at         timestamptz DEFAULT now(),
   created_at           timestamptz NOT NULL DEFAULT now()
 );
