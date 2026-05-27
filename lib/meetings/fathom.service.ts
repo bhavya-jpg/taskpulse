@@ -110,11 +110,18 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
   const meetingTitle = fathomMeeting.title || fathomMeeting.meeting_title || "Fathom Meeting";
   const meetingDate = fathomMeeting.recording_start_time || fathomMeeting.scheduled_start_time || fathomMeeting.created_at || new Date().toISOString();
   
-  // 1. Check if meeting already exists for this user by share_url
-  const { data: existingMeeting, error: checkError } = await supabaseAdmin
+  // 1. Check if meeting already exists for this user/company by share_url
+  let existingMeetingQuery = supabaseAdmin
     .from("meetings")
-    .select("id")
-    .eq("user_id", userId)
+    .select("id, summary, raw_transcript, key_topics, decisions");
+  
+  if (company) {
+    existingMeetingQuery = existingMeetingQuery.eq("company", company);
+  } else {
+    existingMeetingQuery = existingMeetingQuery.eq("user_id", userId);
+  }
+  
+  const { data: existingMeeting, error: checkError } = await existingMeetingQuery
     .eq("transcript_url", shareUrl)
     .maybeSingle();
 
@@ -124,9 +131,56 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
 
   let insertedMeeting = existingMeeting;
   let alreadyExisted = false;
+  let summaryUpdated = false;
 
   if (existingMeeting) {
     console.log(`Meeting already ingested (ID: ${existingMeeting.id})`);
+    alreadyExisted = true;
+
+    // Check if the meeting has an empty summary but we have a summary from Fathom now
+    const summaryMarkdown = fathomMeeting.default_summary?.markdown_formatted || fathomMeeting.default_summary?.text || "";
+    if (summaryMarkdown && (!existingMeeting.summary || existingMeeting.summary.trim() === "")) {
+      console.log(`Updating summary for meeting ${existingMeeting.id}`);
+      
+      const rawTranscript = formatFathomTranscript(fathomMeeting.transcript);
+      const decisions: any[] = [];
+      const keyTopics: string[] = [];
+      
+      if (summaryMarkdown) {
+        const lines = summaryMarkdown.split("\n");
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (cleanLine.startsWith("-") || cleanLine.startsWith("*")) {
+            const item = cleanLine.substring(1).trim();
+            if (item.length > 5 && item.length < 100 && decisions.length < 5) {
+              decisions.push({ decision: item, context: "" });
+            }
+          }
+        }
+      }
+
+      const updateData = {
+        summary: summaryMarkdown,
+        raw_transcript: rawTranscript || existingMeeting.raw_transcript,
+        key_topics: keyTopics.length > 0 ? keyTopics : (existingMeeting.key_topics || ["Fathom Integration", "Meeting Notes"]),
+        decisions: decisions.length > 0 ? decisions : (existingMeeting.decisions || [{ decision: "Fathom meeting notes successfully captured.", context: "" }]),
+      };
+
+      const { error: updateError } = await supabaseAdmin
+        .from("meetings")
+        .update(updateData)
+        .eq("id", existingMeeting.id);
+
+      if (updateError) {
+        console.error("Error updating meeting summary:", updateError);
+      } else {
+        summaryUpdated = true;
+        insertedMeeting = {
+          ...existingMeeting,
+          ...updateData,
+        };
+      }
+    }
     
     // Check if tasks exist for this meeting
     const { data: existingTasks, error: tasksError } = await supabaseAdmin
@@ -140,11 +194,12 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
     
     if (!tasksError && existingTasks && existingTasks.length > 0) {
       // If tasks already exist, skip extraction to avoid duplicate tasks
-      return { meeting: existingMeeting, alreadyExisted: true, tasksCreated: 0 };
+      return { 
+        meeting: insertedMeeting, 
+        alreadyExisted: !summaryUpdated, 
+        tasksCreated: 0 
+      };
     }
-    
-    // If no tasks exist, we will proceed to task extraction using the existing meeting
-    alreadyExisted = true;
   } else {
     // 2. Prepare meeting object
     const rawTranscript = formatFathomTranscript(fathomMeeting.transcript);
@@ -348,7 +403,7 @@ export async function ingestFathomMeeting(userId: string, fathomMeeting: FathomM
 
   return {
     meeting: insertedMeeting,
-    alreadyExisted: alreadyExisted && tasksCreatedCount === 0,
+    alreadyExisted: alreadyExisted && tasksCreatedCount === 0 && !summaryUpdated,
     tasksCreated: tasksCreatedCount,
   };
 }
