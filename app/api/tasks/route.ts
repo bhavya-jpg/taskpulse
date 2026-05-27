@@ -86,10 +86,21 @@ export async function GET(req: NextRequest) {
           // ignore parsing error
         }
       }
+      let clientName = "General";
+      if (t.source_group_name) {
+        if (t.source_group_name.includes(" - ")) {
+          clientName = t.source_group_name.split(" - ")[0].trim();
+        } else if (t.source_group_name.endsWith(" Campaign")) {
+          clientName = t.source_group_name.replace(/ Campaign$/, "").trim();
+        } else {
+          clientName = t.source_group_name.split(" ")[0].trim();
+        }
+      }
+
       return {
         id: t.id,
         title: t.title,
-        client: t.source_group_name ? t.source_group_name.split(" ")[0] : "General",
+        client: clientName,
         assignedTo: t.assignee || "Unassigned",
         deadline: t.deadline ? t.deadline.split("T")[0] : new Date().toISOString().split("T")[0],
         priority: t.priority,

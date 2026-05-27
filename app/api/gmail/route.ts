@@ -172,6 +172,22 @@ export async function GET(request: Request) {
     }
   }
 
+  // Fetch registered company members for assignee mapping
+  let companyMembers: { name: string; designation: string }[] = []
+  if (company) {
+    try {
+      const { data: membersData } = await supabaseAdmin
+        .from("profiles")
+        .select("name, designation")
+        .eq("company", company)
+      if (membersData && Array.isArray(membersData)) {
+        companyMembers = membersData
+      }
+    } catch (err) {
+      console.warn("[Gmail Scan] Failed to fetch company members:", err)
+    }
+  }
+
   const cookieStore = await cookies()
   let token = cookieStore.get("gmail_token")?.value
   const refreshToken = cookieStore.get("gmail_refresh_token")?.value
@@ -307,10 +323,31 @@ If the task is from an email that does NOT match any of these registered clients
 Identify the company or client name associated with this task (e.g., Zomato, Flipkart, Amazon, Google, or Unknown). If it doesn't match any obvious brand, output "General" or "Unknown".`
   }
 
+  let assignmentInstructions = ""
+  if (companyMembers.length > 0) {
+    const employees = companyMembers.filter(m => m.designation === "employee").map(m => m.name)
+    const founders = companyMembers.filter(m => m.designation === "founder").map(m => m.name)
+    assignmentInstructions = `
+CRITICAL ASSIGNMENT RULES:
+The company members are:
+- Registered Employees: [${employees.join(", ")}]
+- Founders/Admins: [${founders.join(", ")}]
+
+Please analyze each email subject/snippet/From address to identify who the task is specifically directed to:
+1. If the message explicitly mentions, tags, or naturally references an Employee name from [${employees.join(", ")}] (case-insensitive, e.g. "Hi Employee A", "Employee A please do this", "can Employee A handle this?"), assign the "assignee" field EXACTLY as their name in that list.
+2. If the message references or is directed to a Founder/Admin from [${founders.join(", ")}], or contains general coordination, or does not specify any particular employee, set the "assignee" field to "Unassigned".
+3. If no specific name is mentioned or the name does not match any of the registered employees, set "assignee" to null.
+4. Auto-assignment Confidence: If you successfully map a task to an employee name from [${employees.join(", ")}], assign a high confidence score (85-100) so the task is automatically confirmed and routed.`
+  } else {
+    assignmentInstructions = `
+Identify the person this task is assigned to based on mentions (e.g. "@Name", "Hi Name"). If unspecified, set "assignee" to null.`
+  }
+
   let text = ""
   try {
     const prompt = `You are a task extraction AI. Analyze these emails and extract actionable tasks.
 ${clientMatchingInstructions}
+${assignmentInstructions}
 
 Here are the emails to analyze:
 ${emailList}
@@ -374,14 +411,66 @@ Respond ONLY with the requested JSON array representing tasks found.`
             }
           }
 
+          // ─── Direct Keyword Matching against Registered Clients ───
+          // If the email subject, snippet or sender mentions a registered client (e.g. "Rapido"),
+          // we match it directly, overriding the "General" or fallback classification.
+          const emailTextToScan = `${emailData.subject} ${emailData.snippet} ${emailData.from}`.toLowerCase()
+          const clientsToScan = registeredClients.length > 0 ? registeredClients : ["Flipkart", "Zomato", "Amazon", "Google"]
+          const matchedByKeyword = clientsToScan.find(rc => {
+            const rcLower = rc.toLowerCase()
+            return emailTextToScan.includes(rcLower)
+          })
+
+          if (matchedByKeyword) {
+            matchedClient = matchedByKeyword
+          }
+
+          // Standardize assignee to match registered company members
+          let matchedAssignee = "Unassigned"
+          const assigneeInput = task.assignee ? String(task.assignee).trim() : ""
+          if (assigneeInput && assigneeInput.toLowerCase() !== "unknown" && assigneeInput.toLowerCase() !== "unassigned" && assigneeInput.toLowerCase() !== "null") {
+            const lowerInput = assigneeInput.toLowerCase()
+            const matchedMember = companyMembers.find(m => m.name.toLowerCase() === lowerInput)
+            if (matchedMember) {
+              matchedAssignee = matchedMember.name
+            } else {
+              // Heuristic mapping for default members if profiles table doesn't have them yet
+              const defaultMembers = ["Rahul", "Priya", "Admin", "Vikas"]
+              const matchedDefault = defaultMembers.find(m => m.toLowerCase() === lowerInput)
+              if (matchedDefault) {
+                matchedAssignee = matchedDefault
+              } else {
+                matchedAssignee = assigneeInput.charAt(0).toUpperCase() + assigneeInput.slice(1)
+              }
+            }
+          }
+
+          // ─── Direct Employee Name Matching from Email Content ───
+          // If the email subject, snippet or sender mentions an employee naturally,
+          // we override assignee and set confidence to 90 to ensure proper automatic confirmation and routing.
+          const emailTextLower = `${emailData.subject} ${emailData.snippet} ${emailData.from}`.toLowerCase()
+          const membersToScan = companyMembers.length > 0 
+            ? companyMembers.filter(m => m.designation === "employee").map(m => m.name)
+            : ["Rahul", "Priya", "Vikas"]
+
+          const matchedEmployee = membersToScan.find(emp => {
+            const empLower = emp.toLowerCase()
+            const regex = new RegExp(`\\b@?${empLower}\\b`, "i")
+            return regex.test(emailTextLower)
+          })
+
+          if (matchedEmployee) {
+            matchedAssignee = matchedEmployee
+            task.confidence = Math.max(task.confidence || 0, 90)
+          }
+
+          if (designation === "employee") {
+            // For employees syncing their own email, default task assignment to themselves
+            matchedAssignee = userName || "Unassigned"
+          }
+
           // Auto-save task into Supabase database with message ID deduplication
           try {
-            let taskAssignee = task.assignee || "Unassigned";
-            if (designation === "employee") {
-              // For employees syncing their own email, default task assignment to themselves
-              taskAssignee = userName || "Unassigned";
-            }
-
             const { data, error } = await supabaseAdmin
               .from("tasks")
               .insert({
@@ -390,9 +479,9 @@ Respond ONLY with the requested JSON array representing tasks found.`
                 title: task.task_title,
                 priority: task.priority || "Medium",
                 deadline: task.deadline || null,
-                assignee: taskAssignee,
+                assignee: matchedAssignee,
                 confidence: task.confidence || 85,
-                status: task.confidence >= 85 ? "confirmed" : "unconfirmed",
+                status: (task.confidence || 85) >= 85 ? "confirmed" : "unconfirmed",
                 source_platform: "email",
                 source_group_name: `${matchedClient} - ${emailData.subject.substring(0, 35)}`,
                 source_sender_name: emailData.from,

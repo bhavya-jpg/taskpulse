@@ -29,21 +29,32 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
   const [connecting, setConnecting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [connectedChannel, setConnectedChannel] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("taskpulse_cached_slack_messages");
+        return cached ? JSON.parse(cached) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loadingMessages, setLoadingMessages] = useState(false);
 
-  const fetchSlackMessages = async () => {
-    setLoadingMessages(true);
+  const fetchSlackMessages = async (silent = false) => {
+    if (!silent) setLoadingMessages(true);
     try {
       const res = await fetch("/api/slack/messages");
       const data = await res.json();
       if (data.messages) {
         setMessages(data.messages);
+        localStorage.setItem("taskpulse_cached_slack_messages", JSON.stringify(data.messages));
       }
     } catch (err) {
       console.error("Failed to fetch Slack messages:", err);
     } finally {
-      setLoadingMessages(false);
+      if (!silent) setLoadingMessages(false);
     }
   };
 
@@ -69,7 +80,8 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
 
   useEffect(() => {
     if (connectedChannel) {
-      fetchSlackMessages();
+      const hasCache = messages.length > 0;
+      fetchSlackMessages(hasCache);
     } else {
       setMessages([]);
     }
@@ -134,9 +146,6 @@ export function SlackSetup({ onToast, loadTasks, setActiveTab }: SlackSetupProps
         await loadTasks();
         await fetchSlackMessages();
         onToast(`AI processed Slack successfully! Scanned channel and synced active tasks.`);
-        if (setActiveTab) {
-          setActiveTab("dashboard");
-        }
       }
     } catch (err) {
       onToast("Failed to run Slack AI scanner.");

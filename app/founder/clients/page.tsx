@@ -1275,6 +1275,7 @@ export default function ClientCommandCenterPage() {
   const [showStakeholderModal, setShowStakeholderModal] = useState(false);
   const [stakeholderModalClient, setStakeholderModalClient] = useState("");
   const [company, setCompany] = useState("");
+  const [registeredClients, setRegisteredClients] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -1318,12 +1319,37 @@ export default function ClientCommandCenterPage() {
     loadProfile();
   }, [status]);
 
-  // Derive clients from tasks
+  // Load registered clients from API
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const loadClients = async () => {
+      try {
+        const r = await fetch("/api/clients");
+        if (r.ok) {
+          const d = await r.json();
+          if (d.clients && Array.isArray(d.clients)) {
+            setRegisteredClients(d.clients);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load registered clients:", err);
+      }
+    };
+    loadClients();
+    const interval = setInterval(loadClients, 5000);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  // Derive clients by combining manually whitelisted clients and tasks
   const clientNames = useMemo(() => {
+    const registeredNames = registeredClients.map((c) => c.name);
     return Array.from(
-      new Set(tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown"))
+      new Set([
+        ...registeredNames,
+        ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")
+      ])
     ).sort();
-  }, [tasks]);
+  }, [tasks, registeredClients]);
 
   // Get tasks per client
   const getClientTasks = (clientName: string) => tasks.filter((t) => t.client === clientName);

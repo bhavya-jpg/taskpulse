@@ -845,7 +845,23 @@ function DashboardView({
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
-  const filteredTasks = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
+  const sourceFiltered = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
+
+  // Founder dashboard should only receive: unassigned tasks, company-wide coordination,
+  // tasks directed to founders/admins, and tasks where AI could not confidently identify an assignee (Needs Review).
+  const isFounderOrAdmin = (name: string | null | undefined) => {
+    if (!name) return true;
+    const lower = name.toLowerCase();
+    return lower === "admin" || lower === "founder" || lower === "unassigned" || lower === "";
+  };
+
+  const filteredTasks = sourceFiltered.filter((t) => {
+    // If it's a confirmed active task (confidence >= 85) assigned to a specific employee, hide from founder's primary dashboard Kanban columns
+    if (t.status === "pending" && t.confidence >= 85 && t.assignedTo) {
+      return isFounderOrAdmin(t.assignedTo);
+    }
+    return true;
+  });
 
   const confirmed = filteredTasks.filter((t) => t.status === "pending" && t.confidence >= 85);
   const unconfirmed = filteredTasks.filter((t) => t.confidence < 85 && t.status !== "done");
@@ -1490,6 +1506,7 @@ function EmailView({
       const data = await res.json();
       if (data.emails) {
         setEmails(data.emails);
+        localStorage.setItem("taskpulse_cached_emails", JSON.stringify(data.emails));
         if (data.emails.length > 0 && !selectedId) {
           setSelectedId(data.emails[0].id);
         }
@@ -2215,7 +2232,17 @@ export default function FounderPage() {
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [emails, setEmails] = useState<any[]>([]);
+  const [emails, setEmails] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("taskpulse_cached_emails");
+        return cached ? JSON.parse(cached) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [emailSelectedId, setEmailSelectedId] = useState<string | null>(null);
 
