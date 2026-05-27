@@ -54,6 +54,7 @@ interface Task {
   client: string;
   assignedTo: string;
   deadline: string;
+  dueAt?: string | null;
   priority: Priority;
   source: Source;
   sourceGroup: string;
@@ -76,8 +77,9 @@ const getClientColors = (client: string) => {
   const predefined: Record<string, { bg: string; text: string; border: string; header: string }> = {
     Flipkart: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
     Zomato: { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
-    Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
+    Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-205", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
     Google: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+    "No Client": { bg: "bg-slate-50/80 dark:bg-slate-700/10", text: "text-slate-600 dark:text-slate-355", border: "border-slate-200/60 dark:border-slate-600/25", header: "bg-slate-600" },
   };
 
   if (client && predefined[client]) return predefined[client];
@@ -117,6 +119,78 @@ function formatDate(dateStr: string) {
 
 function isOverdue(dateStr: string) {
   return new Date(dateStr) < new Date(new Date().toDateString());
+}
+
+function getCountdownText(dueAtStr?: string | null, deadlineStr?: string | null, status?: string) {
+  if (status === "done") {
+    return { text: "Completed", urgency: "done" };
+  }
+
+  let targetTime: number;
+  if (dueAtStr) {
+    targetTime = new Date(dueAtStr).getTime();
+  } else if (deadlineStr) {
+    // Treat date as EOD
+    targetTime = new Date(`${deadlineStr}T23:59:59`).getTime();
+  } else {
+    return null;
+  }
+
+  const now = Date.now();
+  const diff = targetTime - now;
+
+  if (diff <= 0) {
+    const hoursOverdue = Math.abs(Math.floor(diff / (1000 * 60 * 60)));
+    if (hoursOverdue < 1) {
+      const minsOverdue = Math.abs(Math.floor(diff / (1000 * 60)));
+      return { text: `Overdue by ${minsOverdue}m`, urgency: "overdue" };
+    }
+    return { text: `Overdue by ${hoursOverdue}h`, urgency: "overdue" };
+  }
+
+  const mins = Math.floor((diff / (1000 * 60)) % 60);
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days > 0) {
+    return { text: `${days}d ${hours}h remaining`, urgency: days > 2 ? "low" : "medium" };
+  }
+  if (hours > 0) {
+    return { text: `${hours}h ${mins}m left`, urgency: hours > 2 ? "medium" : "high" };
+  }
+  return { text: `Due in ${mins}m`, urgency: "critical" };
+}
+
+function getUrgencyBadge(urgency: string, text: string) {
+  let badgeStyles = "";
+  switch (urgency) {
+    case "done":
+      badgeStyles = "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-500/20";
+      break;
+    case "overdue":
+      badgeStyles = "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-350 border-rose-200/60 dark:border-rose-500/20";
+      break;
+    case "critical":
+      badgeStyles = "bg-rose-500 text-white border-rose-600 dark:bg-rose-600 dark:border-rose-700 shadow-[0_0_8px_rgba(244,63,94,0.3)] animate-pulse";
+      break;
+    case "high":
+      badgeStyles = "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-500/20";
+      break;
+    case "medium":
+      badgeStyles = "bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-200/60 dark:border-teal-500/20";
+      break;
+    case "low":
+    default:
+      badgeStyles = "bg-slate-50 dark:bg-slate-700/10 text-slate-655 dark:text-slate-400 border-slate-200/60 dark:border-slate-600/25";
+      break;
+  }
+
+  return (
+    <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border ${badgeStyles}`}>
+      <Clock size={10} className={urgency === "critical" || urgency === "overdue" ? "animate-pulse" : ""} />
+      {text}
+    </span>
+  );
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
@@ -193,6 +267,21 @@ function TaskCard({
   const [editPriority, setEditPriority] = useState<Priority>(task.priority);
   const [editAssignee, setEditAssignee] = useState(task.assignedTo);
   const [editDeadline, setEditDeadline] = useState(task.deadline);
+  const [editDueTime, setEditDueTime] = useState(
+    task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00"
+  );
+
+  const [timerText, setTimerText] = useState<{ text: string; urgency: string } | null>(null);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const res = getCountdownText(task.dueAt, task.deadline, task.status);
+      setTimerText(res);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 10000); // update every 10s
+    return () => clearInterval(interval);
+  }, [task.dueAt, task.deadline, task.status]);
 
   useEffect(() => {
     setEditTitle(task.title);
@@ -200,6 +289,7 @@ function TaskCard({
     setEditPriority(task.priority);
     setEditAssignee(task.assignedTo);
     setEditDeadline(task.deadline);
+    setEditDueTime(task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00");
   }, [task]);
 
   if (isEditing) {
@@ -214,7 +304,7 @@ function TaskCard({
           </span>
           <button
             onClick={() => setIsEditing(false)}
-            className="text-slate-450 hover:text-slate-655 transition-colors p-1 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-lg cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
+            className="text-slate-455 hover:text-slate-655 transition-colors p-1 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-lg cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
           >
             <X size={14} />
           </button>
@@ -227,7 +317,7 @@ function TaskCard({
             required
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-200 font-semibold outline-none focus:ring-1 focus:ring-teal-500 transition-all"
+            className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-202 font-semibold outline-none focus:ring-1 focus:ring-teal-500 transition-all"
           />
         </div>
 
@@ -237,11 +327,14 @@ function TaskCard({
             <select
               value={editClient}
               onChange={(e) => setEditClient(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-202 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
             >
-              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client])).map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              <option value="No Client">No Client / Internal</option>
+              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client]))
+                .filter(c => c && c !== "No Client" && c !== "General")
+                .map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -249,7 +342,7 @@ function TaskCard({
             <select
               value={editPriority}
               onChange={(e) => setEditPriority(e.target.value as Priority)}
-              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-750 dark:text-slate-202 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
             >
               <option value="High">High</option>
               <option value="Medium">Medium</option>
@@ -258,28 +351,38 @@ function TaskCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1.5 col-span-1">
             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Assignee</label>
             <select
               value={editAssignee}
               disabled={!isFounder}
               onChange={(e) => setEditAssignee(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-705 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-705 rounded-xl px-3 py-2 text-xs text-slate-705 dark:text-slate-202 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
             >
               {activeEmployees.map((emp) => (
                 <option key={emp} value={emp}>{emp}</option>
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline</label>
+          <div className="flex flex-col gap-1.5 col-span-1">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Date</label>
             <input
               type="date"
               required
               value={editDeadline}
               onChange={(e) => setEditDeadline(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-2.5 py-1.5 text-xs text-slate-705 dark:text-slate-200 font-semibold outline-none cursor-pointer"
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-705 dark:text-slate-202 font-semibold outline-none cursor-pointer"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 col-span-1">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Time</label>
+            <input
+              type="time"
+              required
+              value={editDueTime}
+              onChange={(e) => setEditDueTime(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-705 dark:text-slate-202 font-semibold outline-none cursor-pointer"
             />
           </div>
         </div>
@@ -288,12 +391,14 @@ function TaskCard({
           <button
             onClick={async () => {
               if (editTitle.trim()) {
+                const combinedDueAt = new Date(`${editDeadline}T${editDueTime || "18:00"}:00`).toISOString();
                 await onUpdateTask?.(task.id, {
                   title: editTitle.trim(),
                   client: editClient,
                   priority: editPriority,
                   assignedTo: editAssignee,
                   deadline: editDeadline,
+                  dueAt: combinedDueAt,
                 });
                 setIsEditing(false);
               }
@@ -309,9 +414,10 @@ function TaskCard({
               setEditPriority(task.priority);
               setEditAssignee(task.assignedTo);
               setEditDeadline(task.deadline);
+              setEditDueTime(task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00");
               setIsEditing(false);
             }}
-            className="flex-1 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-xl py-2.5 transition-all border border-slate-200 dark:border-slate-700/60 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex-1 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-655 dark:text-slate-300 text-xs font-semibold rounded-xl py-2.5 transition-all border border-slate-200 dark:border-slate-700/60 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
           >
             <X size={13} /> Cancel
           </button>
@@ -319,6 +425,21 @@ function TaskCard({
       </motion.div>
     );
   }
+
+  const getUrgencyStyles = (urgency?: string) => {
+    switch (urgency) {
+      case "overdue":
+      case "critical":
+        return "border-rose-500/80 dark:border-rose-500/50 ring-2 ring-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)] dark:shadow-[0_0_16px_rgba(244,63,94,0.2)] animate-pulse";
+      case "high":
+        return "border-amber-500/70 dark:border-amber-500/40 ring-1 ring-amber-500/10 shadow-[0_0_8px_rgba(245,158,11,0.08)]";
+      case "medium":
+        return "border-teal-500/30 dark:border-teal-500/20 shadow-sm";
+      case "low":
+      default:
+        return "border-slate-200/80 dark:border-slate-800/80 shadow-sm";
+    }
+  };
 
   return (
     <motion.div
@@ -329,7 +450,7 @@ function TaskCard({
       className={`bg-white dark:bg-[#13151a] rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden group ${
         task.isBlocked
           ? "border-amber-500/40 dark:border-amber-500/25 bg-amber-500/[0.01]"
-          : "border-[#eef0f3] dark:border-[#1e2025]"
+          : getUrgencyStyles(timerText?.urgency)
       } hover:shadow-md hover:border-teal-500/30 dark:hover:border-teal-500/30`}
     >
       <div className="p-5 flex flex-col gap-4">
@@ -337,12 +458,13 @@ function TaskCard({
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1.5 items-center">
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-600 dark:text-slate-400">
-              {task.client}
+              {task.client === "No Client" ? "No Client / Internal" : task.client}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-600 dark:text-slate-400">
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-655 dark:text-slate-400">
               <span className={`w-1 h-1 rounded-full ${pc.dot}`} />
               {task.priority}
             </span>
+            {timerText && getUrgencyBadge(timerText.urgency, timerText.text)}
           </div>
 
           <div className="flex items-center gap-2">
@@ -382,7 +504,7 @@ function TaskCard({
               <button
                 onClick={() => setIsEditing(true)}
                 title="Edit Deliverable"
-                className="text-slate-450 hover:text-teal-600 dark:text-slate-500 dark:hover:text-teal-400 p-1 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-lg transition-all cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
+                className="text-slate-455 hover:text-teal-600 dark:text-slate-500 dark:hover:text-teal-400 p-1 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-lg transition-all cursor-pointer border-none bg-transparent flex items-center justify-center outline-none"
               >
                 <Edit2 size={11} />
               </button>
@@ -418,7 +540,7 @@ function TaskCard({
               <select
                 value={task.assignedTo}
                 onChange={(e) => onReassign?.(task.id, e.target.value)}
-                className="bg-transparent border-0 rounded-lg py-0.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-1 focus:ring-teal-500 font-semibold cursor-pointer transition-colors"
+                className="bg-transparent border-0 rounded-lg py-0.5 text-xs text-slate-700 dark:text-slate-205 outline-none focus:ring-1 focus:ring-teal-500 font-semibold cursor-pointer transition-colors"
               >
                 {activeEmployees.map((emp) => (
                   <option key={emp} value={emp}>{emp}</option>
@@ -430,7 +552,7 @@ function TaskCard({
           </div>
           <div className="flex items-center gap-1.5">
             <Calendar size={11} className={overdue ? "text-amber-500" : "text-slate-400"} />
-            <span className={`font-semibold ${overdue ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-600 dark:text-slate-300"}`}>
+            <span className={`font-semibold ${overdue ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-655 dark:text-slate-300"}`}>
               {formatDate(task.deadline)}
             </span>
           </div>
@@ -446,7 +568,7 @@ function TaskCard({
         {/* AI Confidence Badge */}
         {showConfirmButtons && (
           <div className="bg-amber-500/[0.04] border border-amber-500/15 rounded-xl px-2.5 py-2 text-[10px] text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1.5 shadow-sm">
-            <Sparkles size={11} className="text-amber-500" />
+            <Sparkles size={11} className="text-amber-555" />
             AI Confidence: {task.confidence}%
           </div>
         )}
@@ -455,7 +577,7 @@ function TaskCard({
         <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
           <button
             onClick={() => setShowSource((p) => !p)}
-            className="flex items-center justify-between w-full text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-650 dark:hover:text-slate-350 font-semibold transition-colors bg-transparent border-none outline-none cursor-pointer"
+            className="flex items-center justify-between w-full text-[10px] text-slate-400 dark:text-slate-500 hover:text-slate-655 dark:hover:text-slate-350 font-semibold transition-colors bg-transparent border-none outline-none cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
               {showSource ? <EyeOff size={11} /> : <Eye size={11} />}
@@ -535,7 +657,7 @@ function TaskCard({
               </button>
               <button
                 onClick={() => onDismiss?.(task.id)}
-                className="flex-1 bg-white dark:bg-transparent hover:bg-amber-500/[0.04] dark:hover:bg-amber-500/10 text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-200 text-xs font-semibold rounded-xl py-2 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-amber-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                className="flex-1 bg-white dark:bg-transparent hover:bg-amber-500/[0.04] dark:hover:bg-amber-500/10 text-slate-655 dark:text-slate-350 hover:text-amber-700 dark:hover:text-amber-200 text-xs font-semibold rounded-xl py-2 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-amber-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
               >
                 <X size={13} /> Reject
               </button>
@@ -545,7 +667,7 @@ function TaskCard({
               onMarkActive && (
                 <button
                   onClick={() => onMarkActive?.(task.id)}
-                  className="w-full bg-white dark:bg-transparent hover:bg-teal-500/[0.04] dark:hover:bg-teal-500/10 text-slate-600 dark:text-slate-300 hover:text-teal-700 dark:hover:text-teal-200 text-xs font-semibold rounded-xl py-2 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-teal-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                  className="w-full bg-white dark:bg-transparent hover:bg-teal-500/[0.04] dark:hover:bg-teal-500/10 text-slate-655 dark:text-slate-305 hover:text-teal-700 dark:hover:text-teal-200 text-xs font-semibold rounded-xl py-2 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-teal-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
                 >
                   <Undo size={13} className="text-teal-500 dark:text-teal-400" /> Send back to active
                 </button>
@@ -563,7 +685,7 @@ function TaskCard({
                 {onSendToReview && (
                   <button
                     onClick={() => onSendToReview?.(task.id)}
-                    className="w-full bg-white dark:bg-transparent hover:bg-amber-500/[0.04] dark:hover:bg-amber-500/10 text-slate-650 dark:text-slate-305 hover:text-amber-700 dark:hover:text-amber-200 text-xs font-semibold rounded-xl py-2.5 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-amber-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
+                    className="w-full bg-white dark:bg-transparent hover:bg-amber-500/[0.04] dark:hover:bg-amber-500/10 text-slate-655 dark:text-slate-305 hover:text-amber-700 dark:hover:text-amber-200 text-xs font-semibold rounded-xl py-2.5 transition-all border border-slate-200 dark:border-slate-700/60 dark:hover:border-amber-500/20 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
                   >
                     <Undo size={13} className="text-amber-500" /> Send back to review
                   </button>
@@ -1581,6 +1703,7 @@ export default function EmployeeDashboard() {
         if (updatedFields.title !== undefined) body.title = updatedFields.title;
         if (updatedFields.priority !== undefined) body.priority = updatedFields.priority;
         if (updatedFields.deadline !== undefined) body.deadline = updatedFields.deadline;
+        if (updatedFields.dueAt !== undefined) body.dueAt = updatedFields.dueAt;
         if (updatedFields.client !== undefined) body.client = updatedFields.client;
         if (updatedFields.assignedTo !== undefined) body.assignee = updatedFields.assignedTo;
         if (updatedFields.isBlocked !== undefined) body.isBlocked = updatedFields.isBlocked;

@@ -37,6 +37,10 @@ const taskExtractionSchema = {
         type: SchemaType.STRING,
         description: "Deadline in YYYY-MM-DD format, or null if unspecified",
       },
+      due_at: {
+        type: SchemaType.STRING,
+        description: "Precise deadline date and time in ISO 8601 format (e.g. YYYY-MM-DDTHH:MM:SSZ) calculated using the reference current time, or null if unspecified. Intelligently extract from context phrases like 'tomorrow morning at 11 AM', 'tonight', 'by 6 PM today', 'urgent', 'ASAP', etc.",
+      },
       assignee: {
         type: SchemaType.STRING,
         description: "First name of the person this task should be assigned to, or null if unspecified",
@@ -272,7 +276,9 @@ Identify the person this task is assigned to based on mentions (e.g. "@Name", "H
 
     let text = "";
     try {
+      const localTimeRef = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
       const prompt = `You are an elite task extraction AI. Analyze these Slack team messages and extract actionable tasks assigned to team members.
+The current reference local time is: ${localTimeRef}.
 ${clientMatchingInstructions}
 ${assignmentInstructions}
 
@@ -393,24 +399,30 @@ Respond ONLY with the requested JSON array representing tasks found.`;
 
             // Save to database with deduplication using Slack message ts
             try {
+              const insertPayload: any = {
+                user_id: userId,
+                company,
+                title: task.task_title,
+                priority: task.priority || "Medium",
+                deadline: task.deadline || null,
+                assignee: matchedAssignee,
+                confidence: task.confidence || 80,
+                status: (task.confidence || 80) >= 85 ? "confirmed" : "unconfirmed",
+                source_platform: "slack",
+                source_group_name: `${matchedClient} - #${channelName}`,
+                source_sender_name: originalMsg.sender,
+                source_message_text: originalMsg.text,
+                source_message_id: originalMsg.id, // UNIQUE key preventing duplicates
+                source_timestamp: new Date(parseFloat(originalMsg.timestamp) * 1000).toISOString(),
+              };
+              
+              if (task.due_at) {
+                insertPayload.due_at = task.due_at;
+              }
+
               const { data, error } = await supabaseAdmin
                 .from("tasks")
-                .insert({
-                  user_id: userId,
-                  company,
-                  title: task.task_title,
-                  priority: task.priority || "Medium",
-                  deadline: task.deadline || null,
-                  assignee: matchedAssignee,
-                  confidence: task.confidence || 80,
-                  status: (task.confidence || 80) >= 85 ? "confirmed" : "unconfirmed",
-                  source_platform: "slack",
-                  source_group_name: `${matchedClient} - #${channelName}`,
-                  source_sender_name: originalMsg.sender,
-                  source_message_text: originalMsg.text,
-                  source_message_id: originalMsg.id, // UNIQUE key preventing duplicates
-                  source_timestamp: new Date(parseFloat(originalMsg.timestamp) * 1000).toISOString(),
-                })
+                .insert(insertPayload)
                 .select()
                 .single();
 
@@ -421,6 +433,7 @@ Respond ONLY with the requested JSON array representing tasks found.`;
                   client: matchedClient,
                   assignedTo: data.assignee || "Unassigned",
                   deadline: data.deadline ? data.deadline.split("T")[0] : new Date().toISOString().split("T")[0],
+                  dueAt: data.due_at || null,
                   priority: data.priority,
                   source: "slack",
                   sourceGroup: data.source_group_name || `#${channelName}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -61,6 +61,7 @@ interface Task {
   client: string;
   assignedTo: string;
   deadline: string;
+  dueAt?: string | null;
   priority: Priority;
   source: Source;
   sourceGroup: string;
@@ -96,6 +97,7 @@ const getClientColors = (client: string) => {
     Zomato: { bg: "bg-amber-50/80 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200/60 dark:border-amber-500/20", header: "bg-amber-500" },
     Amazon: { bg: "bg-slate-100/80 dark:bg-slate-700/20", text: "text-slate-700 dark:text-slate-200", border: "border-slate-200/70 dark:border-slate-600/40", header: "bg-slate-700" },
     Google: { bg: "bg-teal-50/80 dark:bg-teal-500/10", text: "text-teal-700 dark:text-teal-300", border: "border-teal-200/60 dark:border-teal-500/20", header: "bg-teal-600" },
+    "No Client": { bg: "bg-slate-50/80 dark:bg-slate-700/10", text: "text-slate-600 dark:text-slate-350", border: "border-slate-200/60 dark:border-slate-600/25", header: "bg-slate-600" },
   };
 
   if (client && predefined[client]) return predefined[client];
@@ -135,6 +137,78 @@ function formatDate(dateStr: string) {
 
 function isOverdue(dateStr: string) {
   return new Date(dateStr) < new Date(new Date().toDateString());
+}
+
+function getCountdownText(dueAtStr?: string | null, deadlineStr?: string | null, status?: string) {
+  if (status === "done") {
+    return { text: "Completed", urgency: "done" };
+  }
+
+  let targetTime: number;
+  if (dueAtStr) {
+    targetTime = new Date(dueAtStr).getTime();
+  } else if (deadlineStr) {
+    // Treat date as EOD
+    targetTime = new Date(`${deadlineStr}T23:59:59`).getTime();
+  } else {
+    return null;
+  }
+
+  const now = Date.now();
+  const diff = targetTime - now;
+
+  if (diff <= 0) {
+    const hoursOverdue = Math.abs(Math.floor(diff / (1000 * 60 * 60)));
+    if (hoursOverdue < 1) {
+      const minsOverdue = Math.abs(Math.floor(diff / (1000 * 60)));
+      return { text: `Overdue by ${minsOverdue}m`, urgency: "overdue" };
+    }
+    return { text: `Overdue by ${hoursOverdue}h`, urgency: "overdue" };
+  }
+
+  const mins = Math.floor((diff / (1000 * 60)) % 60);
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days > 0) {
+    return { text: `${days}d ${hours}h remaining`, urgency: days > 2 ? "low" : "medium" };
+  }
+  if (hours > 0) {
+    return { text: `${hours}h ${mins}m left`, urgency: hours > 2 ? "medium" : "high" };
+  }
+  return { text: `Due in ${mins}m`, urgency: "critical" };
+}
+
+function getUrgencyBadge(urgency: string, text: string) {
+  let badgeStyles = "";
+  switch (urgency) {
+    case "done":
+      badgeStyles = "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-500/20";
+      break;
+    case "overdue":
+      badgeStyles = "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-350 border-rose-200/60 dark:border-rose-500/20";
+      break;
+    case "critical":
+      badgeStyles = "bg-rose-500 text-white border-rose-600 dark:bg-rose-600 dark:border-rose-700 shadow-[0_0_8px_rgba(244,63,94,0.3)] animate-pulse";
+      break;
+    case "high":
+      badgeStyles = "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-500/20";
+      break;
+    case "medium":
+      badgeStyles = "bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-200/60 dark:border-teal-500/20";
+      break;
+    case "low":
+    default:
+      badgeStyles = "bg-slate-50 dark:bg-slate-700/10 text-slate-655 dark:text-slate-400 border-slate-200/60 dark:border-slate-600/25";
+      break;
+  }
+
+  return (
+    <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border ${badgeStyles}`}>
+      <Clock size={10} className={urgency === "critical" || urgency === "overdue" ? "animate-pulse" : ""} />
+      {text}
+    </span>
+  );
 }
 
 // Toast
@@ -211,6 +285,21 @@ function TaskCard({
   const [editPriority, setEditPriority] = useState<Priority>(task.priority);
   const [editAssignee, setEditAssignee] = useState(task.assignedTo);
   const [editDeadline, setEditDeadline] = useState(task.deadline);
+  const [editDueTime, setEditDueTime] = useState(
+    task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00"
+  );
+
+  const [timerText, setTimerText] = useState<{ text: string; urgency: string } | null>(null);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const res = getCountdownText(task.dueAt, task.deadline, task.status);
+      setTimerText(res);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 10000); // update every 10s
+    return () => clearInterval(interval);
+  }, [task.dueAt, task.deadline, task.status]);
 
   useEffect(() => {
     setEditTitle(task.title);
@@ -218,6 +307,7 @@ function TaskCard({
     setEditPriority(task.priority);
     setEditAssignee(task.assignedTo);
     setEditDeadline(task.deadline);
+    setEditDueTime(task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00");
   }, [task]);
 
   if (isEditing) {
@@ -257,9 +347,12 @@ function TaskCard({
               onChange={(e) => setEditClient(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
             >
-              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client])).map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              <option value="No Client">No Client / Internal</option>
+              {Array.from(new Set(["Flipkart", "Zomato", "Amazon", "Google", task.client]))
+                .filter(c => c && c !== "No Client" && c !== "General")
+                .map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -276,8 +369,8 @@ function TaskCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1.5 col-span-1">
             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Assignee</label>
             <select
               value={editAssignee}
@@ -290,13 +383,23 @@ function TaskCard({
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline</label>
+          <div className="flex flex-col gap-1.5 col-span-1">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Date</label>
             <input
               type="date"
               required
               value={editDeadline}
               onChange={(e) => setEditDeadline(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 col-span-1">
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Time</label>
+            <input
+              type="time"
+              required
+              value={editDueTime}
+              onChange={(e) => setEditDueTime(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#181a20] border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-teal-500 transition-all"
             />
           </div>
@@ -306,12 +409,14 @@ function TaskCard({
           <button
             onClick={async () => {
               if (editTitle.trim()) {
+                const combinedDueAt = new Date(`${editDeadline}T${editDueTime || "18:00"}:00`).toISOString();
                 await onUpdateTask?.(task.id, {
                   title: editTitle.trim(),
                   client: editClient,
                   priority: editPriority,
                   assignedTo: editAssignee,
                   deadline: editDeadline,
+                  dueAt: combinedDueAt,
                 });
                 setIsEditing(false);
               }
@@ -327,6 +432,7 @@ function TaskCard({
               setEditPriority(task.priority);
               setEditAssignee(task.assignedTo);
               setEditDeadline(task.deadline);
+              setEditDueTime(task.dueAt ? new Date(task.dueAt).toTimeString().split(" ")[0].substring(0, 5) : "18:00");
               setIsEditing(false);
             }}
             className="flex-1 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 text-xs font-semibold rounded-xl py-2.5 transition-all border border-slate-200 dark:border-slate-700/60 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] cursor-pointer"
@@ -338,6 +444,21 @@ function TaskCard({
     );
   }
 
+  const getUrgencyStyles = (urgency?: string) => {
+    switch (urgency) {
+      case "overdue":
+      case "critical":
+        return "border-rose-500/80 dark:border-rose-500/50 ring-2 ring-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.15)] dark:shadow-[0_0_16px_rgba(244,63,94,0.2)] animate-pulse";
+      case "high":
+        return "border-amber-500/70 dark:border-amber-500/40 ring-1 ring-amber-500/10 shadow-[0_0_8px_rgba(245,158,11,0.08)]";
+      case "medium":
+        return "border-teal-500/30 dark:border-teal-500/20 shadow-sm";
+      case "low":
+      default:
+        return "border-slate-200/80 dark:border-slate-800/80 shadow-sm";
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -347,20 +468,21 @@ function TaskCard({
       className={`bg-white dark:bg-[#13151a] rounded-2xl shadow-sm border transition-all duration-300 overflow-hidden group ${
         task.isBlocked
           ? "border-amber-500/40 dark:border-amber-500/25 bg-amber-500/[0.01]"
-          : "border-[#eef0f3] dark:border-[#1e2025]"
+          : getUrgencyStyles(timerText?.urgency)
       } hover:shadow-md hover:border-teal-500/30 dark:hover:border-teal-500/30`}
     >
       <div className="p-5 flex flex-col gap-4">
         {/* Header tags and metadata */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-650 dark:text-slate-400">
-              {task.client}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-600 dark:text-slate-400">
+              {task.client === "No Client" ? "No Client / Internal" : task.client}
             </span>
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-650 dark:text-slate-400">
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#191b22] text-slate-655 dark:text-slate-400">
               <span className={`w-1 h-1 rounded-full ${pc.dot}`} />
               {task.priority}
             </span>
+            {timerText && getUrgencyBadge(timerText.urgency, timerText.text)}
           </div>
 
           <div className="flex items-center gap-2">
@@ -650,6 +772,7 @@ function ManualTaskCreator({
     assignedTo: string;
     deadline: string;
     priority: Priority;
+    dueAt?: string;
   }) => Promise<void>;
   tasks: Task[];
   employeesList?: string[];
@@ -658,7 +781,7 @@ function ManualTaskCreator({
   const [title, setTitle] = useState("");
 
   const dynamicClients = Array.from(
-    new Set(["Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")])
+    new Set(["No Client", "Flipkart", "Zomato", "Amazon", "Google", ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown" && c !== "No Client")])
   );
 
   const activeEmployees = employeesList || EMPLOYEES;
@@ -666,6 +789,7 @@ function ManualTaskCreator({
   const [client, setClient] = useState(dynamicClients[0]);
   const [assignedTo, setAssignedTo] = useState(activeEmployees[0]);
   const [deadline, setDeadline] = useState("");
+  const [dueTime, setDueTime] = useState("18:00");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [submitting, setSubmitting] = useState(false);
 
@@ -681,15 +805,27 @@ function ManualTaskCreator({
     }
   }, [employeesList]);
 
+  const setQuickDuration = (hours: number) => {
+    const now = new Date();
+    const future = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    const dateStr = future.toISOString().split("T")[0];
+    const timeStr = future.toTimeString().split(" ")[0].substring(0, 5);
+    setDeadline(dateStr);
+    setDueTime(timeStr);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !deadline) return;
 
     setSubmitting(true);
     try {
-      await onAddTask({ title, client, assignedTo, deadline, priority });
+      const timePart = dueTime || "18:00";
+      const dueAtISO = new Date(`${deadline}T${timePart}:00`).toISOString();
+      await onAddTask({ title, client, assignedTo, deadline, priority, dueAt: dueAtISO });
       setTitle("");
       setDeadline("");
+      setDueTime("18:00");
       setIsOpen(false);
     } finally {
       setSubmitting(false);
@@ -734,7 +870,7 @@ function ManualTaskCreator({
               />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Client</label>
                 <select
@@ -743,7 +879,7 @@ function ManualTaskCreator({
                   className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-semibold"
                 >
                   {dynamicClients.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>{c === "No Client" ? "No Client / Internal" : c}</option>
                   ))}
                 </select>
               </div>
@@ -775,15 +911,34 @@ function ManualTaskCreator({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline</label>
+                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Date</label>
                 <input
                   type="date"
                   required
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
-                  className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+                  className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-semibold"
                 />
               </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deadline Time</label>
+                <input
+                  type="time"
+                  required
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                  className="bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 items-center bg-slate-50/50 dark:bg-[#121316]/30 border border-slate-100 dark:border-slate-800/80 rounded-xl p-2.5">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mr-1">Quick Countdowns:</span>
+              <button type="button" onClick={() => setQuickDuration(2)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/65 bg-white dark:bg-[#16181e] text-slate-600 dark:text-slate-300 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer">+2 Hours</button>
+              <button type="button" onClick={() => setQuickDuration(12)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/65 bg-white dark:bg-[#16181e] text-slate-600 dark:text-slate-300 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer">+12 Hours</button>
+              <button type="button" onClick={() => setQuickDuration(24)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/65 bg-white dark:bg-[#16181e] text-slate-600 dark:text-slate-300 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer">+24 Hours</button>
+              <button type="button" onClick={() => setQuickDuration(72)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/65 bg-white dark:bg-[#16181e] text-slate-600 dark:text-slate-300 hover:border-teal-500 hover:text-teal-600 transition-colors cursor-pointer">+3 Days</button>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-slate-200/70 dark:border-slate-700/60 pt-3">
@@ -1098,6 +1253,39 @@ function DashboardView({
 
 // Client view
 
+interface Stakeholder {
+  id: string;
+  name: string;
+  email?: string;
+  slackId?: string;
+  role: string;
+  category?: string;
+  clientName: string;
+}
+
+function getStakeholdersStorageKey(company: string, clientName: string) {
+  return `taskpulse_stakeholders_${company}_${clientName}`;
+}
+
+function loadLocalStakeholders(company: string, clientName: string): Stakeholder[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(getStakeholdersStorageKey(company, clientName));
+    return raw ? JSON.parse(raw) : [
+      { id: "sh-1", name: "Rahul Sharma", role: "Account Manager", category: "Strategy", clientName },
+      { id: "sh-2", name: "Priya Patel", role: "Designer", category: "Design", clientName },
+    ];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalStakeholders(company: string, clientName: string, stakeholders: Stakeholder[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(getStakeholdersStorageKey(company, clientName), JSON.stringify(stakeholders));
+}
+
+// Redesigned Card-Based Client Portfolio & Command Center
 function ClientView({
   tasks,
   onMarkDone,
@@ -1111,12 +1299,17 @@ function ClientView({
   onMarkActive?: (id: number | string) => void;
   employeesList?: string[];
 }) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [newClientName, setNewClientName] = useState("");
   const [loadingClients, setLoadingClients] = useState(false);
   const [addingClient, setAddingClient] = useState(false);
   const [schemaNotInitialized, setSchemaNotInitialized] = useState(false);
+  
+  // Navigation & Search State
+  const [activeClient, setActiveClient] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [healthFilter, setHealthFilter] = useState<"all" | "at-risk" | "active">("all");
+  const [sortOption, setSortOption] = useState<"task-count" | "overdue" | "alphabetical">("task-count");
 
   const fetchClients = async () => {
     setLoadingClients(true);
@@ -1186,50 +1379,106 @@ function ClientView({
     }
   };
 
-  // Combine manually whitelisted database clients and historically extracted client names to remain 100% robust and safe
+  // Resolve dynamic whitelisted clients + historically extracted names
   const registeredNames = clients.map((c) => c.name);
   const dynamicClients = Array.from(
     new Set([
       ...registeredNames,
-      ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown")
+      ...tasks.map((t) => t.client).filter((c) => c && c !== "General" && c !== "Unknown" && c !== "No Client")
     ])
   ).sort();
 
-  const total = tasks.length;
-  const highPriority = tasks.filter((t) => t.priority === "High").length;
-  const overdue = tasks.filter((t) => isOverdue(t.deadline) && t.status !== "done").length;
-  const done = tasks.filter((t) => t.status === "done").length;
+  // Stats calculation
+  const totalTasks = tasks.length;
+  const totalHigh = tasks.filter((t) => t.priority === "High").length;
+  const totalOverdue = tasks.filter((t) => isOverdue(t.deadline) && t.status !== "done").length;
+  const totalDone = tasks.filter((t) => t.status === "done").length;
+
+  // Filtered and Sorted Client Cards
+  const clientCardsData = useMemo(() => {
+    return dynamicClients
+      .map((clientName) => {
+        const clientTasks = tasks.filter((t) => t.client === clientName);
+        const active = clientTasks.filter((t) => t.status === "pending");
+        const completed = clientTasks.filter((t) => t.status === "done");
+        const overdue = active.filter((t) => isOverdue(t.deadline));
+        
+        const healthScore = clientTasks.length === 0 
+          ? 100 
+          : Math.round(((clientTasks.length - overdue.length) / clientTasks.length) * 100);
+
+        return {
+          name: clientName,
+          tasks: clientTasks,
+          activeCount: active.length,
+          completedCount: completed.length,
+          overdueCount: overdue.length,
+          health: healthScore,
+        };
+      })
+      .filter((card) => {
+        // Search Filter
+        if (searchQuery.trim() !== "" && !card.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
+        }
+        // Health Filter
+        if (healthFilter === "at-risk") {
+          return card.health < 80 || card.overdueCount > 0;
+        }
+        if (healthFilter === "active") {
+          return card.activeCount > 0;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortOption === "task-count") {
+          return b.activeCount - a.activeCount;
+        }
+        if (sortOption === "overdue") {
+          return b.overdueCount - a.overdueCount;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [dynamicClients, tasks, searchQuery, healthFilter, sortOption]);
+
+  if (activeClient) {
+    const clientTasks = tasks.filter((t) => t.client === activeClient);
+    return (
+      <ClientWorkspaceView
+        clientName={activeClient}
+        tasks={clientTasks}
+        onBack={() => setActiveClient(null)}
+        onMarkDone={onMarkDone}
+        onUpdateTask={onUpdateTask}
+        onMarkActive={onMarkActive}
+        employeesList={employeesList}
+      />
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Tasks by Client</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{tasks.filter((t) => t.status === "pending").length} pending tasks across all clients</p>
-        </div>
-      </div>
-
-      {/* Premium Glassmorphic Client Registry Manager */}
-      <div className="bg-white/80 dark:bg-[#1c1e22]/80 backdrop-blur-md rounded-2xl p-5 border border-slate-200/60 dark:border-slate-800/80 shadow-sm mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+    <div className="space-y-6">
+      {/* Search, Filter, Sort and Whitelist Registry Hub */}
+      <div className="bg-white/80 dark:bg-[#1c1e22]/80 backdrop-blur-md rounded-2xl p-5 border border-slate-200/60 dark:border-slate-800/80 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <FolderPlus size={18} className="text-teal-600 dark:text-teal-400" />
-              Client Registry
+              Client Registry whitelist
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Manually register active brands to instruct the AI scanners (Gmail & Slack) to perfectly filter tasks for these clients.
+              Whitelisted brands instructs AI scanners (Gmail, Slack, whatsapp) to route tasks to dedicated command hubs.
             </p>
           </div>
           
-          <form onSubmit={handleAddClient} className="flex items-center gap-2 w-full md:w-auto">
+          <form onSubmit={handleAddClient} className="flex items-center gap-2 w-full lg:w-auto shrink-0">
             <input
               type="text"
-              placeholder="e.g. Rapido, HDFC, Zomato"
+              placeholder="e.g. Flipkart, Zomato, Amazon, Rapido"
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
               disabled={addingClient}
-              className="px-3.5 py-2 bg-slate-50 dark:bg-[#121316] text-sm text-slate-850 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 flex-1 md:w-56"
+              className="px-3.5 py-2 bg-slate-50 dark:bg-[#121316] text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 flex-1 lg:w-60 font-semibold"
             />
             <button
               type="submit"
@@ -1252,14 +1501,14 @@ function ClientView({
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2.5 mt-2">
+          <div className="flex flex-wrap gap-2">
             {loadingClients ? (
-              <div className="flex items-center gap-1.5 py-1.5 px-3 text-xs text-slate-400 font-medium">
+              <div className="flex items-center gap-1.5 py-1 text-xs text-slate-400 font-medium">
                 <Loader2 size={12} className="animate-spin" /> Loading clients...
               </div>
             ) : clients.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1.5 px-1">
-                No custom clients registered yet. The AI is running in general parsing mode (Flipkart, Zomato, etc. supported).
+              <p className="text-xs text-slate-400 dark:text-slate-500 italic py-1">
+                No custom clients whitelisted yet. AI operates in auto-detection compatibility mode.
               </p>
             ) : (
               clients.map((c) => {
@@ -1267,7 +1516,7 @@ function ClientView({
                 return (
                   <div
                     key={c.id}
-                    className="flex items-center gap-2 py-1.5 pl-3 pr-2 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 rounded-full transition-all text-xs font-semibold text-slate-700 dark:text-slate-350 shadow-sm"
+                    className="flex items-center gap-2 py-1 pl-3 pr-2 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 rounded-full transition-all text-xs font-semibold text-slate-700 dark:text-slate-350 shadow-sm"
                   >
                     <span className="flex items-center gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${colors.header.replace("bg-gradient-to-r from-", "bg-").split(" ")[0]}`} />
@@ -1278,7 +1527,7 @@ function ClientView({
                       className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700/50 border-0 cursor-pointer outline-none transition-all"
                       title={`Remove ${c.name}`}
                     >
-                      <Trash size={12} />
+                      <X size={10} />
                     </button>
                   </div>
                 );
@@ -1288,75 +1537,795 @@ function ClientView({
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatBox icon={<BarChart2 size={18} className="text-teal-600 dark:text-teal-300" />} label="Total Tasks" value={total} color="bg-teal-50 dark:bg-teal-500/10" />
-        <StatBox icon={<AlertTriangle size={18} className="text-amber-600 dark:text-amber-300" />} label="High Priority" value={highPriority} color="bg-amber-50 dark:bg-amber-500/10" />
-        <StatBox icon={<Clock size={18} className="text-amber-600 dark:text-amber-300" />} label="Overdue" value={overdue} color="bg-amber-50 dark:bg-amber-500/10" />
-        <StatBox icon={<CheckCircle2 size={18} className="text-slate-600 dark:text-slate-300" />} label="Completed" value={done} color="bg-slate-100 dark:bg-slate-700/30" />
+      {/* Grid Filter and Sorting Toolbar */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/70 dark:bg-[#15171b]/70 border border-slate-250/60 dark:border-slate-850 p-4 rounded-2xl shadow-sm">
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            placeholder="Search clients by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl py-2 pl-3.5 pr-8 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Filter:</span>
+            <select
+              value={healthFilter}
+              onChange={(e) => setHealthFilter(e.target.value as any)}
+              className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-650 dark:text-slate-350 outline-none cursor-pointer"
+            >
+              <option value="all">All Health states</option>
+              <option value="at-risk">At Risk / Overdue</option>
+              <option value="active">Active Accounts</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Sort:</span>
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as any)}
+              className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-650 dark:text-slate-350 outline-none cursor-pointer"
+            >
+              <option value="task-count">Most Active Tasks</option>
+              <option value="overdue">Most Overdue</option>
+              <option value="alphabetical">Alphabetical</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {dynamicClients.map((client) => {
-          const clientTasks = tasks.filter((t) => t.client === client);
-          const clientDone = clientTasks.filter((t) => t.status === "done").length;
-          const cc = getClientColors(client);
-          const open = !collapsed[client];
+      {/* Summary Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatBox icon={<Briefcase size={18} className="text-teal-600 dark:text-teal-300" />} label="whitelisted Clients" value={dynamicClients.length} color="bg-teal-50 dark:bg-teal-500/10" />
+        <StatBox icon={<AlertTriangle size={18} className="text-amber-600 dark:text-amber-300" />} label="High Priorities" value={totalHigh} color="bg-amber-50 dark:bg-amber-500/10" />
+        <StatBox icon={<Clock size={18} className="text-amber-600 dark:text-amber-300" />} label="Total Overdue" value={totalOverdue} color="bg-amber-50 dark:bg-amber-500/10" />
+        <StatBox icon={<CheckCircle2 size={18} className="text-slate-600 dark:text-slate-300" />} label="Completed Deliverables" value={totalDone} color="bg-slate-100 dark:bg-slate-700/30" />
+      </div>
 
-          return (
-            <div key={client} className="bg-white dark:bg-[#15171b] rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-slate-700/60">
-              <button
-                className={`w-full flex items-center justify-between px-5 py-4 ${cc.header} text-white transition-all cursor-pointer border-0 outline-none`}
-                onClick={() => setCollapsed((p) => ({ ...p, [client]: !p[client] }))}
+      {/* Modern Client Command Grid */}
+      {clientCardsData.length === 0 ? (
+        <div className="text-center py-16 bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-3xl p-6">
+          <Briefcase size={36} className="text-slate-400 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">No client accounts found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            Try adjusting your search criteria or register a new brand in the whitelist above to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {clientCardsData.map((card) => {
+            const cc = getClientColors(card.name);
+            const active = card.tasks.filter((t) => t.status === "pending");
+            const done = card.tasks.filter((t) => t.status === "done");
+            const overdue = active.filter((t) => isOverdue(t.deadline));
+            const waiting = active.filter((t) => t.confidence < 85);
+            
+            // Connected sources icons
+            const sources = Array.from(new Set(card.tasks.map((t) => t.source)));
+            // Employees working on client
+            const assignees = Array.from(new Set(card.tasks.map((t) => t.assignedTo))).filter(a => a !== "Unassigned");
+            
+            return (
+              <motion.div
+                key={card.name}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-[#15171b] border border-slate-200/70 dark:border-slate-700/60 rounded-2xl shadow-sm hover:shadow-md hover:border-teal-500/30 dark:hover:border-teal-500/30 transition-all duration-300 overflow-hidden flex flex-col"
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-base">{client}</span>
-                  <span className="bg-white/20 text-white text-xs font-semibold rounded-full px-2 py-0.5">
-                    {clientTasks.length} tasks
-                  </span>
+                {/* Header */}
+                <div className={`${cc.header} px-5 py-4 flex items-center justify-between text-white`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center font-bold text-xs shrink-0">
+                      {card.name.charAt(0)}
+                    </div>
+                    <h3 className="font-semibold text-sm truncate">{card.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {sources.map(src => (
+                      <span key={src} className="w-5 h-5 rounded bg-white/15 flex items-center justify-center" title={`Channel: ${src}`}>
+                        {src === "slack" ? <Hash size={10} /> : src === "email" ? <Mail size={10} /> : <MessageCircle size={10} />}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </button>
 
-              <AnimatePresence initial={false}>
-                {open && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-5 pt-4 pb-2">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="flex-1 bg-slate-100 dark:bg-slate-700/40 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${cc.header}`}
-                            style={{ width: clientTasks.length ? `${(clientDone / clientTasks.length) * 100}%` : "0%" }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                          {clientDone}/{clientTasks.length} done
-                        </span>
+                {/* Body */}
+                <div className="p-4 flex flex-col gap-3.5 flex-1">
+                  {/* Account Details */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="font-bold uppercase tracking-wider">Health Index:</span>
+                      <span className={`font-bold ${card.health >= 80 ? "text-emerald-600 dark:text-emerald-400" : card.health >= 50 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-450"}`}>
+                        {card.health}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="font-bold uppercase tracking-wider">Team Working:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                        {assignees.length > 0 ? assignees.join(", ") : "Unassigned"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Stat Grid */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-slate-50 dark:bg-[#121316] rounded-xl p-2 text-center border border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{active.length}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Active</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-[#121316] rounded-xl p-2 text-center border border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{done.length}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Done</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-[#121316] rounded-xl p-2 text-center border border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-rose-650 dark:text-rose-400">{overdue.length}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Overdue</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-[#121316] rounded-xl p-2 text-center border border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{waiting.length}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Review</p>
+                    </div>
+                  </div>
+
+                  {/* Progress Slider */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-500 font-bold">
+                      <span>PROJECT PROGRESS</span>
+                      <span>{done.length}/{card.tasks.length} DONE</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div className={`h-full ${cc.header} rounded-full transition-all`} style={{ width: card.tasks.length ? `${(done.length / card.tasks.length) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+
+                  {/* Quick Preview Feed */}
+                  {active.length > 0 && (
+                    <div className="bg-slate-50 dark:bg-[#111215] border border-slate-100 dark:border-slate-800/80 rounded-xl overflow-hidden mt-1">
+                      <div className="px-3 py-1.5 border-b border-slate-200/50 dark:border-slate-800/60 bg-slate-100/50 dark:bg-[#17181c] text-[8px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider">
+                        Deliverable Priorities
                       </div>
-                      <div className="flex flex-col gap-3 pb-4">
-                        <AnimatePresence>
-                          {clientTasks.length === 0 ? (
-                            <EmptyState message="No tasks for this client" />
-                          ) : (
-                             clientTasks.map((t) => (
-                              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
-                            ))
-                          )}
-                        </AnimatePresence>
+                      <div className="divide-y divide-slate-150/40 dark:divide-slate-800/40 max-h-[120px] overflow-y-auto no-scrollbar">
+                        {active.slice(0, 3).map((t) => {
+                          const timeText = getCountdownText(t.dueAt, t.deadline, t.status);
+                          return (
+                            <div key={t.id} className="p-2 flex flex-col gap-1 hover:bg-slate-100/45 dark:hover:bg-slate-800/30 transition-colors">
+                              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">{t.title}</span>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded border ${PRIORITY_CONFIG[t.priority].bg} ${PRIORITY_CONFIG[t.priority].border} ${PRIORITY_CONFIG[t.priority].text}`}>
+                                  {t.priority}
+                                </span>
+                                {timeText && (
+                                  <span className={`text-[8px] font-bold flex items-center gap-1 ${
+                                    timeText.urgency === "critical" || timeText.urgency === "overdue" ? "text-rose-500 animate-pulse" : "text-slate-400"
+                                  }`}>
+                                    <Clock size={8} /> {timeText.text}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
+                  )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="px-4 pb-4 pt-1 flex gap-2 shrink-0">
+                  <button
+                    onClick={() => setActiveClient(card.name)}
+                    className="flex-1 bg-teal-650 hover:bg-teal-700 text-white text-[10px] font-bold rounded-xl py-2 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer border-none"
+                  >
+                    <FolderPlus size={12} /> Open Console
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 🎛️ CLIENT DEDICATED WORKSPACE MODULE
+function ClientWorkspaceView({
+  clientName,
+  tasks,
+  onBack,
+  onMarkDone,
+  onUpdateTask,
+  onMarkActive,
+  employeesList,
+}: {
+  clientName: string;
+  tasks: Task[];
+  onBack: () => void;
+  onMarkDone: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  onMarkActive?: (id: number | string) => void;
+  employeesList?: string[];
+}) {
+  const [currentSubTab, setCurrentSubTab] = useState<"overview" | "kanban" | "stakeholders" | "activity">("overview");
+  
+  // Stats
+  const activeTasks = tasks.filter((t) => t.status === "pending");
+  const completedTasks = tasks.filter((t) => t.status === "done");
+  const overdueTasks = activeTasks.filter((t) => isOverdue(t.deadline));
+  const waitingForClient = activeTasks.filter((t) => t.confidence < 85);
+  
+  const cc = getClientColors(clientName);
+  const healthScore = tasks.length === 0 ? 100 : Math.round(((tasks.length - overdueTasks.length) / tasks.length) * 100);
+  const assignees = Array.from(new Set(tasks.map((t) => t.assignedTo))).filter(a => a !== "Unassigned");
+
+  // Stakeholder persistence inside local state resolved from LocalStorage
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  
+  useEffect(() => {
+    setStakeholders(loadLocalStakeholders("agency", clientName));
+  }, [clientName]);
+
+  const addStakeholder = (name: string, role: string, category: string, email: string) => {
+    const newSh: Stakeholder = {
+      id: "sh-" + Date.now(),
+      name,
+      role,
+      category: category || undefined,
+      email: email || undefined,
+      clientName,
+    };
+    const updated = [...stakeholders, newSh];
+    setStakeholders(updated);
+    saveLocalStakeholders("agency", clientName, updated);
+  };
+
+  const removeStakeholder = (id: string) => {
+    const updated = stakeholders.filter((s) => s.id !== id);
+    setStakeholders(updated);
+    saveLocalStakeholders("agency", clientName, updated);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Workspace Header Panel */}
+      <div className="bg-white/80 dark:bg-[#15171b] rounded-3xl p-6 relative overflow-hidden border border-slate-200/70 dark:border-slate-700/60 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1%_1%,rgba(13,148,136,0.06),transparent_40%)] pointer-events-none" />
+        <div className="relative z-10 space-y-2">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer bg-transparent border-none outline-none"
+          >
+            <ArrowLeft size={13} /> Return to Accounts
+          </button>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-white">{clientName} Command Hub</h1>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+              healthScore >= 80 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-250/20" : "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-450 border border-rose-250/20"
+            }`}>
+              Health: {healthScore}%
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+            Manage stakeholders, extract incoming email requests, monitor priority delivery health, and run your client Kanban system inside a single collaborative station.
+          </p>
+        </div>
+
+        {/* Global Progress Dial */}
+        <div className="relative shrink-0 flex items-center gap-4 bg-slate-50/50 dark:bg-[#121316]/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4">
+          <div className="w-12 h-12 rounded-full border-4 border-slate-200 dark:border-slate-800 flex items-center justify-center text-xs font-extrabold text-slate-800 dark:text-slate-200 relative">
+            {tasks.length ? Math.round((completedTasks.length / tasks.length) * 100) : 100}%
+            <div className={`absolute inset-0 border-4 border-teal-650 rounded-full clip-half`} style={{ transform: `rotate(${tasks.length ? (completedTasks.length / tasks.length) * 360 : 360}deg)` }} />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-slate-800 dark:text-slate-200 leading-tight">{completedTasks.length}/{tasks.length}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Deliverables Completed</p>
+          </div>
+        </div>
       </div>
+
+      {/* Tabs Menu Panel */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar gap-1.5 pb-0.5 shrink-0">
+        <button
+          onClick={() => setCurrentSubTab("overview")}
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer outline-none bg-transparent ${
+            currentSubTab === "overview" ? "border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-500 font-bold" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Overview & AI Ingestion
+        </button>
+        <button
+          onClick={() => setCurrentSubTab("kanban")}
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer outline-none bg-transparent ${
+            currentSubTab === "kanban" ? "border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-500 font-bold" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Client Kanban Board
+        </button>
+        <button
+          onClick={() => setCurrentSubTab("stakeholders")}
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer outline-none bg-transparent ${
+            currentSubTab === "stakeholders" ? "border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-500 font-bold" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Stakeholders Map ({stakeholders.length})
+        </button>
+        <button
+          onClick={() => setCurrentSubTab("activity")}
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer outline-none bg-transparent ${
+            currentSubTab === "activity" ? "border-teal-600 text-teal-600 dark:text-teal-400 dark:border-teal-500 font-bold" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          Activity Timeline
+        </button>
+      </div>
+
+      {/* Tabs Content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentSubTab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.15 }}
+        >
+          {currentSubTab === "overview" && (
+            <WorkspaceOverviewTab
+              clientName={clientName}
+              tasks={tasks}
+              stakeholders={stakeholders}
+              onMarkDone={onMarkDone}
+              onUpdateTask={onUpdateTask}
+              onMarkActive={onMarkActive}
+              employeesList={employeesList}
+            />
+          )}
+
+          {currentSubTab === "kanban" && (
+            <WorkspaceKanbanTab
+              tasks={tasks}
+              onMarkDone={onMarkDone}
+              onUpdateTask={onUpdateTask}
+              onMarkActive={onMarkActive}
+              employeesList={employeesList}
+            />
+          )}
+
+          {currentSubTab === "stakeholders" && (
+            <WorkspaceStakeholdersTab
+              stakeholders={stakeholders}
+              tasks={tasks}
+              onAdd={addStakeholder}
+              onRemove={removeStakeholder}
+            />
+          )}
+
+          {currentSubTab === "activity" && (
+            <WorkspaceActivityTab tasks={tasks} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// 🏡 WORKSPACE OVERVIEW PANEL SUBTAB
+function WorkspaceOverviewTab({
+  clientName,
+  tasks,
+  stakeholders,
+  onMarkDone,
+  onUpdateTask,
+  onMarkActive,
+  employeesList,
+}: {
+  clientName: string;
+  tasks: Task[];
+  stakeholders: Stakeholder[];
+  onMarkDone: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  onMarkActive?: (id: number | string) => void;
+  employeesList?: string[];
+}) {
+  const active = tasks.filter((t) => t.status === "pending");
+  const overdue = active.filter((t) => isOverdue(t.deadline));
+  const waiting = active.filter((t) => t.confidence < 85);
+  
+  // AI parser state
+  const [rawText, setRawText] = useState("");
+  const [extractedItems, setExtractedItems] = useState<{ title: string; priority: Priority; deadline: string; assignee: string }[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleExtract = () => {
+    if (!rawText.trim()) return;
+    setIsExtracting(true);
+    setTimeout(() => {
+      // Mock extract based on simple string splits
+      const sentences = rawText.split(/[.!?\n]/).filter((s) => s.trim().length > 12);
+      const output = sentences.slice(0, 3).map((s, i) => {
+        const clean = s.trim();
+        const hasUrgent = /urgent|asap|today|immediately/i.test(clean);
+        const hasTomorrow = /tomorrow|evening/i.test(clean);
+        const days = hasUrgent ? 0 : hasTomorrow ? 1 : 4 + i;
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + days);
+        return {
+          title: clean.length > 50 ? clean.substring(0, 48) + "..." : clean,
+          priority: hasUrgent ? "High" as Priority : hasTomorrow ? "Medium" as Priority : "Low" as Priority,
+          deadline: targetDate.toISOString().split("T")[0],
+          assignee: employeesList?.[i % employeesList.length] || "Rahul",
+        };
+      });
+      setExtractedItems(output);
+      setIsExtracting(false);
+    }, 1200);
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-6">
+        {/* Core Stats Overview */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <p className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{active.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Active Deliverables</p>
+          </div>
+          <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <p className="text-3xl font-extrabold text-rose-500">{overdue.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Overdue Items</p>
+          </div>
+          <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col items-center justify-center">
+            <p className="text-3xl font-extrabold text-amber-500">{waiting.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Pending Review</p>
+          </div>
+        </div>
+
+        {/* AI Task Extraction Console */}
+        <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-850 dark:text-slate-200 flex items-center gap-1.5">
+              <Sparkles size={15} className="text-violet-500" />
+              AI Ingestion & Task Extraction
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Paste arbitrary client email threads or Slack request briefs. TaskPulse extracts structured assignments.
+            </p>
+          </div>
+
+          <textarea
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            placeholder='e.g. "Hi Priya, can you send the finalized designs for Amazon before tomorrow morning review at 11 AM? Make sure Vikas does the QA by EOD today as well."'
+            className="w-full bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl p-3 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-violet-500 min-h-[90px] resize-none font-semibold leading-relaxed"
+          />
+
+          <div className="flex justify-end shrink-0">
+            <button
+              onClick={handleExtract}
+              disabled={isExtracting || !rawText.trim()}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border-none"
+            >
+              {isExtracting ? (
+                <><Loader2 size={12} className="animate-spin text-white" /> Extracting...</>
+              ) : (
+                <><Sparkles size={12} /> Analyze & Extract Tasks</>
+              )}
+            </button>
+          </div>
+
+          {extractedItems.length > 0 && (
+            <div className="space-y-2 border-t border-slate-100 dark:border-slate-800/80 pt-4">
+              <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider mb-2">EXTRACTED TASKS SUGGESTIONS</span>
+              {extractedItems.map((item, idx) => (
+                <div key={idx} className="bg-slate-50 dark:bg-[#111215] border border-slate-150 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2 relative group transition-all">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug">{item.title}</p>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded border ${PRIORITY_CONFIG[item.priority].bg} ${PRIORITY_CONFIG[item.priority].border} ${PRIORITY_CONFIG[item.priority].text}`}>
+                      {item.priority}
+                    </span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold flex items-center gap-1">
+                      <User size={9} /> {item.assignee}
+                    </span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold flex items-center gap-1">
+                      <Calendar size={9} /> Due: {formatDate(item.deadline)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Side Details Bar */}
+      <div className="space-y-6">
+        {/* Stakeholder Registry Map summary */}
+        <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 space-y-3">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Connected Stakeholders</span>
+          {stakeholders.length === 0 ? (
+            <p className="text-[11px] text-slate-400 italic py-1">No whitelisted stakeholders. Map them in the tab above.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {stakeholders.map((sh) => (
+                <div key={sh.id} className="flex items-center gap-2 bg-slate-50 dark:bg-[#111215] border border-slate-100 dark:border-slate-800 p-2 rounded-xl">
+                  <div className="w-5 h-5 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center border border-teal-200/50 dark:border-teal-500/20">
+                    <User size={10} className="text-teal-600 dark:text-teal-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-850 dark:text-slate-200 truncate leading-tight">{sh.name}</p>
+                    <p className="text-[9px] text-slate-400 dark:text-slate-500 truncate mt-0.5">{sh.role} · {sh.category || "General"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Channels */}
+        <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 space-y-3">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Overview summary</span>
+          <p className="text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+            This account registry holds {tasks.length} total historical deliverable tasks.
+            {overdue.length > 0 ? ` Note: ${overdue.length} items are currently overdue which drops account health to ${healthScore}%.` : " The account remains fully on schedule."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 📋 CLIENT KANBAN BOARD TAB MODULE
+function WorkspaceKanbanTab({
+  tasks,
+  onMarkDone,
+  onUpdateTask,
+  onMarkActive,
+  employeesList,
+}: {
+  tasks: Task[];
+  onMarkDone: (id: number | string) => void;
+  onUpdateTask?: (id: number | string, updatedFields: Partial<Task>) => Promise<void>;
+  onMarkActive?: (id: number | string) => void;
+  employeesList?: string[];
+}) {
+  const needsConfirm = tasks.filter((t) => t.status === "pending" && t.confidence < 85);
+  const activeTasks = tasks.filter((t) => t.status === "pending" && t.confidence >= 85);
+  const completed = tasks.filter((t) => t.status === "done");
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* 1. Review Column */}
+      <div className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-850 p-4 rounded-2xl flex flex-col gap-4 min-h-[450px]">
+        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <h3 className="text-xs font-extrabold text-amber-700 dark:text-amber-350 uppercase tracking-wider flex items-center gap-1.5">
+            Needs Review ({needsConfirm.length})
+          </h3>
+        </div>
+        <div className="flex flex-col gap-3 overflow-y-auto no-scrollbar flex-1">
+          {needsConfirm.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 italic text-[11px]">No items pending confirmation</div>
+          ) : (
+            needsConfirm.map((t) => (
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} showConfirmButtons={true} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 2. Confirmed Column */}
+      <div className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-850 p-4 rounded-2xl flex flex-col gap-4 min-h-[450px]">
+        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <h3 className="text-xs font-extrabold text-teal-700 dark:text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+            Active Delivery ({activeTasks.length})
+          </h3>
+        </div>
+        <div className="flex flex-col gap-3 overflow-y-auto no-scrollbar flex-1">
+          {activeTasks.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 italic text-[11px]">No active deliverables</div>
+          ) : (
+            activeTasks.map((t) => (
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 3. Completed Column */}
+      <div className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-850 p-4 rounded-2xl flex flex-col gap-4 min-h-[450px]">
+        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <h3 className="text-xs font-extrabold text-slate-550 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            Completed ({completed.length})
+          </h3>
+        </div>
+        <div className="flex flex-col gap-3 overflow-y-auto no-scrollbar flex-1">
+          {completed.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 italic text-[11px]">No items completed</div>
+          ) : (
+            completed.map((t) => (
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 👥 WORKSPACE STAKEHOLDERS REGISTRY SUBTAB
+function WorkspaceStakeholdersTab({
+  stakeholders,
+  tasks,
+  onAdd,
+  onRemove,
+}: {
+  stakeholders: Stakeholder[];
+  tasks: Task[];
+  onAdd: (name: string, role: string, category: string, email: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [shName, setShName] = useState("");
+  const [shRole, setShRole] = useState("Designer");
+  const [shCategory, setShCategory] = useState("Design");
+  const [shEmail, setShEmail] = useState("");
+
+  const handleAddSh = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shName.trim()) return;
+    onAdd(shName.trim(), shRole, shCategory, shEmail.trim());
+    setShName("");
+    setShEmail("");
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 1. Stakeholders Registry List */}
+      <div className="lg:col-span-2 bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-5 space-y-4">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Registered Account Stakeholders</span>
+        
+        {stakeholders.length === 0 ? (
+          <div className="text-center py-12 text-slate-400 italic text-xs">No stakeholders mapped. Register POCs on the right.</div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {stakeholders.map((s) => {
+              const assigned = tasks.filter((t) => t.assignedTo.toLowerCase() === s.name.toLowerCase() && t.status === "pending").length;
+              return (
+                <div key={s.id} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center border border-teal-200/50 dark:border-teal-500/20">
+                      <User size={13} className="text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate leading-snug">{s.name}</h4>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{s.role} · {s.category || "General"} {s.email ? `· ${s.email}` : ""}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200/50 dark:border-slate-700/60">
+                      {assigned} active tasks
+                    </span>
+                    <button
+                      onClick={() => onRemove(s.id)}
+                      className="p-1 rounded text-slate-450 hover:text-red-500 dark:hover:text-red-400 bg-transparent border-0 cursor-pointer outline-none transition-colors"
+                      title="Remove mapping"
+                    >
+                      <Trash size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Add Stakeholder registry form */}
+      <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-5 space-y-4">
+        <div>
+          <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Map Stakeholder</h3>
+          <p className="text-[10px] text-slate-450 mt-0.5">Map project team members or external clients for deliverable filters.</p>
+        </div>
+
+        <form onSubmit={handleAddSh} className="space-y-3.5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[9px] font-bold text-slate-450 uppercase">Full Name *</label>
+            <input
+              type="text"
+              required
+              value={shName}
+              onChange={(e) => setShName(e.target.value)}
+              placeholder="e.g. Vikas Gupta"
+              className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[9px] font-bold text-slate-450 uppercase">Email / slack ID</label>
+            <input
+              type="text"
+              value={shEmail}
+              onChange={(e) => setShEmail(e.target.value)}
+              placeholder="vikas@company.com or @vikas"
+              className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-bold text-slate-450 uppercase">Role *</label>
+              <select
+                value={shRole}
+                onChange={(e) => setShRole(e.target.value)}
+                className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+              >
+                <option value="Account Manager">Account Manager</option>
+                <option value="Designer">Designer</option>
+                <option value="Strategist">Strategist</option>
+                <option value="Client POC">Client POC</option>
+                <option value="Founder">Founder</option>
+                <option value="Freelancer">Freelancer</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-bold text-slate-450 uppercase">Department</label>
+              <select
+                value={shCategory}
+                onChange={(e) => setShCategory(e.target.value)}
+                className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+              >
+                <option value="Design">Design</option>
+                <option value="Strategy">Strategy</option>
+                <option value="Content">Content</option>
+                <option value="Reporting">Reporting</option>
+                <option value="None">None</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!shName.trim()}
+            className="w-full bg-teal-650 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl py-2.5 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer border-none"
+          >
+            <Plus size={13} /> Add Stakeholder
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// 📜 WORKSPACE ACTIVITY LOG TIMELINE TAB MODULE
+function WorkspaceActivityTab({ tasks }: { tasks: Task[] }) {
+  const sorted = [...tasks].sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
+  return (
+    <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-5 space-y-4">
+      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Deliverable Timeline Logs</span>
+      
+      {sorted.length === 0 ? (
+        <div className="text-center py-10 text-slate-400 italic text-xs">No activity timeline logged yet.</div>
+      ) : (
+        <div className="relative border-l border-slate-150 dark:border-slate-800 pl-4 ml-2 space-y-5">
+          {sorted.slice(0, 8).map((t, idx) => (
+            <div key={t.id} className="relative group">
+              <span className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#15171b] ${
+                t.status === "done" ? "bg-emerald-500" : isOverdue(t.deadline) ? "bg-rose-500" : "bg-teal-500"
+              }`} />
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold block">{formatDate(t.deadline)}</span>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-snug">{t.title}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                  Assigned to <span className="font-semibold text-slate-600 dark:text-slate-400">{t.assignedTo}</span> · Source Group: {t.sourceGroup} · Status: <span className="font-semibold">{t.status}</span>
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

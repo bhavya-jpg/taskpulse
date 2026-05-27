@@ -84,10 +84,12 @@ RESPOND ONLY WITH VALID JSON — no markdown, no explanation outside the JSON:
   "task_title": "Action-oriented title starting with a verb (max 12 words)",
   "priority": "High" | "Medium" | "Low",
   "deadline": "YYYY-MM-DD" | null,
+  "due_at": "YYYY-MM-DDTHH:MM:SSZ" | null,
   "assignee": "Person's first name or full name" | null,
   "confidence": 0-100,
   "reason": "One sentence explaining the decision"
-}`;
+}
+Note: Calculate the "due_at" precise deadline date and time based on context expressions (like ASAP, tomorrow 11 AM, tonight, etc.) relative to the message's timestamp context. Output null if not specified.`;
 
 function buildUserPrompt(msg: IncomingMessage, senderRole: string): string {
   const contextBlock = msg.threadContext.length > 0
@@ -135,12 +137,13 @@ export class AIExtractionService {
       else if (parsed.priority === "Medium") parsed.priority = "High";
     }
 
-    const task: ExtractedTask = {
+    const task: ExtractedTask & { due_at?: string | null } = {
       id: crypto.randomUUID(),
       userId,
       title: parsed.task_title,
       priority: parsed.priority,
       deadline: parsed.deadline ?? null,
+      due_at: parsed.due_at ?? null,
       assignee: parsed.assignee ?? null,
       confidence: parsed.confidence,
       status: parsed.confidence >= 85 ? "confirmed" : "unconfirmed",
@@ -160,8 +163,8 @@ export class AIExtractionService {
     return task;
   }
 
-  private async saveTask(task: ExtractedTask): Promise<void> {
-    await supabaseAdmin.from("tasks").insert({
+  private async saveTask(task: ExtractedTask & { due_at?: string | null }): Promise<void> {
+    const insertPayload: any = {
       id: task.id,
       user_id: task.userId,
       title: task.title,
@@ -178,7 +181,13 @@ export class AIExtractionService {
       source_timestamp: new Date(task.sourcePayload.timestamp * 1000).toISOString(),
       source_message_id: task.sourcePayload.messageId,
       created_at: new Date().toISOString(),
-    });
+    };
+
+    if (task.due_at) {
+      insertPayload.due_at = task.due_at;
+    }
+
+    await supabaseAdmin.from("tasks").insert(insertPayload);
   }
 
   private async getSenderRole(userId: string, groupJid: string, senderJid: string): Promise<string> {

@@ -86,15 +86,22 @@ export async function GET(req: NextRequest) {
           // ignore parsing error
         }
       }
-      let clientName = "General";
+      let clientName = "No Client";
       if (t.source_group_name) {
-        if (t.source_group_name.includes(" - ")) {
-          clientName = t.source_group_name.split(" - ")[0].trim();
-        } else if (t.source_group_name.endsWith(" Campaign")) {
-          clientName = t.source_group_name.replace(/ Campaign$/, "").trim();
+        const sgn = t.source_group_name.trim();
+        if (sgn === "No Client" || sgn === "Internal Task" || sgn === "No Client Campaign" || sgn === "Internal Task Campaign" || sgn === "#manual-tasks") {
+          clientName = "No Client";
+        } else if (sgn.includes(" - ")) {
+          clientName = sgn.split(" - ")[0].trim();
+        } else if (sgn.endsWith(" Campaign")) {
+          clientName = sgn.replace(/ Campaign$/, "").trim();
         } else {
-          clientName = t.source_group_name.split(" ")[0].trim();
+          clientName = sgn.split(" ")[0].trim();
         }
+      }
+
+      if (clientName === "General" && (!t.source_group_name || t.source_group_name === "General Chat")) {
+        clientName = "No Client";
       }
 
       return {
@@ -103,6 +110,7 @@ export async function GET(req: NextRequest) {
         client: clientName,
         assignedTo: t.assignee || "Unassigned",
         deadline: t.deadline ? t.deadline.split("T")[0] : new Date().toISOString().split("T")[0],
+        dueAt: t.due_at || null,
         priority: t.priority,
         source: t.source_platform || "whatsapp",
         sourceGroup: t.source_group_name || "General Chat",
@@ -129,11 +137,11 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client } = body;
+    const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client, dueAt } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-
+ 
     const updateFields: any = {};
-
+ 
     if (status !== undefined) {
       updateFields.status = status;
     }
@@ -150,7 +158,10 @@ export async function PUT(req: NextRequest) {
       updateFields.deadline = deadline;
     }
     if (client !== undefined) {
-      updateFields.source_group_name = `${client} Campaign`;
+      updateFields.source_group_name = client === "No Client" ? "No Client" : `${client} Campaign`;
+    }
+    if (dueAt !== undefined) {
+      updateFields.due_at = dueAt;
     }
     if (isBlocked !== undefined || blockerNote !== undefined) {
       const sourceQuoteJSON = JSON.stringify({
@@ -195,16 +206,17 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as any).id;
 
   try {
-    const { title, client, assignedTo, priority, deadline } = await req.json();
+    const { title, client, assignedTo, priority, deadline, dueAt } = await req.json();
     if (!title || !client) return NextResponse.json({ error: "title and client are required" }, { status: 400 });
-
+ 
     // 1. Fetch current user's profile to resolve company
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("company")
       .eq("id", userId)
       .single();
-
+ 
+    const clientName = client === "No Client" ? "No Client" : client;
     const insertData: any = {
       user_id: userId,
       title,
@@ -214,14 +226,18 @@ export async function POST(req: NextRequest) {
       status: "confirmed",
       confidence: 100,
       source_platform: "whatsapp",
-      source_group_name: `${client} Campaign`,
-      source_message_text: `Manually created task for ${client}`,
+      source_group_name: clientName === "No Client" ? "No Client" : `${clientName} Campaign`,
+      source_message_text: clientName === "No Client" ? "Manually created internal task" : `Manually created task for ${clientName}`,
     };
-
+ 
     if (profile?.company) {
       insertData.company = profile.company;
     }
-
+    
+    if (dueAt) {
+      insertData.due_at = dueAt;
+    }
+ 
     const { data, error } = await supabaseAdmin
       .from("tasks")
       .insert(insertData)

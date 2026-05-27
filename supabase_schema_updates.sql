@@ -85,3 +85,9 @@ CREATE TABLE IF NOT EXISTS stakeholders (
 -- Disable RLS on the stakeholders table for collaborative testing simplicity
 ALTER TABLE stakeholders DISABLE ROW LEVEL SECURITY;
 
+
+-- ─── 8. TASK COUNTDOWN TIMERS ────────────────────────────────────────────────
+-- Add a column to support precise due date/time for real-time countdown timers.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_at timestamptz;
+
+
