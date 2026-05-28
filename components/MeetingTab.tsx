@@ -4,11 +4,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Video, FileText, Upload, Plus, Calendar as CalendarIcon, User, CheckCircle2, AlertCircle, Loader2, ChevronDown, ChevronUp, RefreshCw, Sparkles, List } from "lucide-react";
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import enUS from 'date-fns/locale/en-US';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = {
@@ -207,12 +204,28 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [currentView, setCurrentView] = useState<any>('month');
+  
   const [uploadData, setUploadData] = useState({
     title: "",
     platform: "manual",
     date: new Date().toISOString().split('T')[0],
     participants: "",
     transcript: null as File | null,
+  });
+
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [newEventData, setNewEventData] = useState({
+    title: "",
+    platform: "google_meet",
+    meetingType: "client",
+    clientName: "",
+    description: "",
+    date: "",
+    startTime: "",
+    endTime: "",
   });
 
   const handleToggleTaskStatus = async (task: any) => {
@@ -222,6 +235,74 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
       await onUpdateTask(task.id, { status: newStatus });
     } catch (err) {
       console.error("Failed to toggle task status", err);
+    }
+  };
+
+  const handleSelectSlot = ({ start, end }: { start: Date; end: Date }) => {
+    // format date as YYYY-MM-DD (adjust for timezone offset to get local date correctly)
+    const year = start.getFullYear();
+    const month = String(start.getMonth() + 1).padStart(2, '0');
+    const day = String(start.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    // format time as HH:MM
+    const startHrs = String(start.getHours()).padStart(2, '0');
+    const startMins = String(start.getMinutes()).padStart(2, '0');
+    const startTimeStr = `${startHrs}:${startMins}`;
+
+    const endHrs = String(end.getHours()).padStart(2, '0');
+    const endMins = String(end.getMinutes()).padStart(2, '0');
+    const endTimeStr = `${endHrs}:${endMins}`;
+
+    setNewEventData({
+      title: "",
+      platform: "google_meet",
+      meetingType: "client",
+      clientName: "",
+      description: "",
+      date: dateStr,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+    });
+    setIsScheduling(true);
+  };
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingEvent(true);
+
+    try {
+      // Reconstruct start and end dates using date, startTime, and endTime strings
+      const startDateTime = new Date(`${newEventData.date}T${newEventData.startTime}:00`);
+      const endDateTime = new Date(`${newEventData.date}T${newEventData.endTime}:00`);
+
+      const res = await fetch("/api/meetings/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newEventData.title,
+          start: startDateTime.toISOString(),
+          end: endDateTime.toISOString(),
+          platform: newEventData.platform,
+          meetingType: newEventData.meetingType,
+          clientName: newEventData.clientName,
+          description: newEventData.description,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsScheduling(false);
+        // Refresh the calendar events to show the new one!
+        fetchCalendarEvents();
+      } else {
+        alert(data.error || "Failed to schedule calendar event.");
+      }
+    } catch (err) {
+      console.error("Error creating calendar event:", err);
+      alert("Network error. Failed to schedule event.");
+    } finally {
+      setIsSubmittingEvent(false);
     }
   };
 
@@ -239,10 +320,27 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
     }
   };
 
-  const fetchCalendarEvents = async () => {
+  const fetchCalendarEvents = async (date: Date = currentDate, view: string = currentView) => {
     setCalendarError(null);
     try {
-      const res = await fetch("/api/meetings/calendar");
+      // Calculate dynamic range to optimize loading times while covering grid overflows
+      const start = new Date(date);
+      const end = new Date(date);
+
+      if (view === 'month') {
+        start.setMonth(start.getMonth() - 1);
+        start.setDate(1);
+        end.setMonth(end.getMonth() + 2);
+        end.setDate(0);
+      } else if (view === 'week') {
+        start.setDate(start.getDate() - 7);
+        end.setDate(end.getDate() + 14);
+      } else {
+        start.setDate(start.getDate() - 3);
+        end.setDate(end.getDate() + 7);
+      }
+
+      const res = await fetch(`/api/meetings/calendar?start=${start.toISOString()}&end=${end.toISOString()}`);
       const data = await res.json();
       if (res.ok && data.success && data.events) {
         const formatted = data.events.map((ev: any) => ({
@@ -273,8 +371,11 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
 
   useEffect(() => {
     fetchMeetings();
-    fetchCalendarEvents();
   }, []);
+
+  useEffect(() => {
+    fetchCalendarEvents(currentDate, currentView);
+  }, [currentDate, currentView]);
 
   const handleGoogleSync = async () => {
     setIsSyncing(true);
@@ -830,6 +931,12 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
                 style={{ flex: 1 }}
                 className="font-sans text-sm dark:text-slate-300"
                 onSelectEvent={(event) => setSelectedEvent(event)}
+                selectable
+                onSelectSlot={handleSelectSlot}
+                date={currentDate}
+                view={currentView}
+                onNavigate={(date) => setCurrentDate(date)}
+                onView={(view) => setCurrentView(view)}
                 eventPropGetter={(event) => {
                   let backgroundColor = '#0f766e'; // teal-700 default
                   if (event.isProcessed) {
@@ -974,6 +1081,225 @@ export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
               </div>
             </motion.div>
           )}
+
+          {isScheduling && (() => {
+            const selectedDateEvents = calendarEvents.filter(ev => {
+              if (!ev.start) return false;
+              const evStart = new Date(ev.start);
+              const year = evStart.getFullYear();
+              const month = String(evStart.getMonth() + 1).padStart(2, '0');
+              const day = String(evStart.getDate()).padStart(2, '0');
+              const evDateStr = `${year}-${month}-${day}`;
+              return evDateStr === newEventData.date;
+            }).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+            return (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                onClick={() => setIsScheduling(false)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="bg-white dark:bg-[#15171b] w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <form onSubmit={handleCreateEvent} className="p-6 flex flex-col max-h-[85vh] overflow-hidden">
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <CalendarIcon className="text-teal-500" size={20} />
+                        Quick Schedule Meeting
+                      </h3>
+                      <button type="button" onClick={() => setIsScheduling(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors bg-transparent border-0 cursor-pointer outline-none">
+                        <Plus className="rotate-45" size={24} />
+                      </button>
+                    </div>
+
+                    {/* Scrollable Content */}
+                    <div className="overflow-y-auto flex-1 pr-1 space-y-5 my-1">
+                      {/* Current Schedule for the Date */}
+                      <div className="pb-4 border-b border-slate-100 dark:border-slate-800/80">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2.5 flex items-center gap-1.5 tracking-wider">
+                          <List size={13} className="text-teal-500" />
+                          Current Schedule ({new Date(newEventData.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })})
+                        </h4>
+                        {selectedDateEvents.length > 0 ? (
+                          <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                            {selectedDateEvents.map((ev: any) => {
+                              const evStart = new Date(ev.start);
+                              const evEnd = ev.end ? new Date(ev.end) : null;
+                              const startTimeFormatted = format(evStart, 'h:mm a');
+                              const endTimeFormatted = evEnd ? format(evEnd, 'h:mm a') : '';
+                              
+                              return (
+                                <div key={ev.id || ev.title} className="bg-slate-50/80 dark:bg-[#121316]/80 border border-slate-100 dark:border-slate-800 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs shadow-sm">
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                      {ev.title || "Untitled Event"}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                      {startTimeFormatted} {endTimeFormatted ? ` - ${endTimeFormatted}` : ''}
+                                    </p>
+                                  </div>
+                                  {ev.meetingType && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase flex-shrink-0 ${
+                                      ev.meetingType === 'client' ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400' :
+                                      ev.meetingType === 'internal_client' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' :
+                                      'bg-slate-100 dark:bg-slate-700/40 text-slate-500'
+                                    }`}>
+                                      {ev.meetingType.replace('_', ' ')}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 italic bg-slate-50/50 dark:bg-[#121316]/30 border border-dashed border-slate-200/40 dark:border-slate-800/40 p-2.5 rounded-xl text-center">
+                            📅 No other meetings scheduled on this date.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Scheduling Form Fields */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Quick Event Schedule
+                        </h4>
+                        
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Meeting Title</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Client Sync / QBR / Kickoff"
+                            className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none text-slate-800 dark:text-slate-200 font-semibold"
+                            value={newEventData.title}
+                            onChange={e => setNewEventData({...newEventData, title: e.target.value})}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Platform</label>
+                            <select
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-4 py-2 text-sm outline-none text-slate-800 dark:text-slate-200 font-semibold cursor-pointer"
+                              value={newEventData.platform}
+                              onChange={e => setNewEventData({...newEventData, platform: e.target.value})}
+                            >
+                              <option value="google_meet">Google Meet (Auto Link)</option>
+                              <option value="manual">Manual / In Person</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Meeting Type</label>
+                            <select
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-4 py-2 text-sm outline-none text-slate-800 dark:text-slate-200 font-semibold cursor-pointer"
+                              value={newEventData.meetingType}
+                              onChange={e => setNewEventData({...newEventData, meetingType: e.target.value})}
+                            >
+                              <option value="client">Client Meeting</option>
+                              <option value="internal_client">Internal Client Meeting</option>
+                              <option value="normal">General Meeting</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {(newEventData.meetingType === 'client' || newEventData.meetingType === 'internal_client') && (
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Client Name</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g., Zomato, Google"
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none text-slate-800 dark:text-slate-200 font-semibold"
+                              value={newEventData.clientName}
+                              onChange={e => setNewEventData({...newEventData, clientName: e.target.value})}
+                            />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Date</label>
+                            <input
+                              type="date"
+                              required
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-3 py-2 text-xs outline-none text-slate-800 dark:text-slate-200 font-semibold cursor-pointer"
+                              value={newEventData.date}
+                              onChange={e => setNewEventData({...newEventData, date: e.target.value})}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Start Time</label>
+                            <input
+                              type="time"
+                              required
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-3 py-2 text-xs outline-none text-slate-800 dark:text-slate-200 font-semibold cursor-pointer"
+                              value={newEventData.startTime}
+                              onChange={e => setNewEventData({...newEventData, startTime: e.target.value})}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-450 uppercase">End Time</label>
+                            <input
+                              type="time"
+                              required
+                              className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-3 py-2 text-xs outline-none text-slate-800 dark:text-slate-200 font-semibold cursor-pointer"
+                              value={newEventData.endTime}
+                              onChange={e => setNewEventData({...newEventData, endTime: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Description / Agenda (Optional)</label>
+                          <textarea
+                            rows={3}
+                            placeholder="Discuss product roadmap, deliverables, and outstanding action items..."
+                            className="w-full bg-slate-50 dark:bg-[#121316] border border-slate-200/70 dark:border-slate-700/60 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none text-slate-800 dark:text-slate-200 font-medium resize-none"
+                            value={newEventData.description}
+                            onChange={e => setNewEventData({...newEventData, description: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Actions Sticky */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800/60 mt-4 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsScheduling(false)}
+                        className="bg-slate-100 hover:bg-slate-200 dark:bg-[#1c1d22] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 text-sm font-semibold px-4 py-2 rounded-lg border-0 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingEvent}
+                        className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-sm font-semibold px-4 py-2 rounded-lg border-0 flex items-center gap-2 transition-colors cursor-pointer"
+                      >
+                        {isSubmittingEvent ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Scheduling...
+                          </>
+                        ) : (
+                          <>Schedule Event</>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </motion.div>
+            );
+          })()}
 
           {/* Meetings List */}
           {activeTab === 'list' && (

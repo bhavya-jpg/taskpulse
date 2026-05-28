@@ -102,3 +102,68 @@ export async function updateGoogleCalendarEventDescription(accessToken: string, 
     },
   });
 }
+
+export async function createGoogleCalendarEvent(
+  accessToken: string,
+  eventDetails: {
+    title: string;
+    start: string;
+    end: string;
+    platform: string;
+    description?: string;
+    meetingType?: string;
+    clientName?: string;
+  }
+) {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+
+  const calendar = google.calendar({ version: "v3", auth });
+
+  // Format description with client tags if present
+  let tagSnippet = "";
+  if (eventDetails.meetingType) {
+    if (eventDetails.meetingType === "client" && eventDetails.clientName) {
+      tagSnippet = `#client: ${eventDetails.clientName}`;
+    } else if (eventDetails.meetingType === "internal_client" && eventDetails.clientName) {
+      tagSnippet = `#internal_client: ${eventDetails.clientName}`;
+    } else if (eventDetails.meetingType === "normal") {
+      tagSnippet = `#normal`;
+    }
+  }
+
+  const finalDescription = eventDetails.description
+    ? `${eventDetails.description}\n\n${tagSnippet}`.trim()
+    : tagSnippet;
+
+  const requestBody: any = {
+    summary: eventDetails.title,
+    description: finalDescription,
+    start: {
+      dateTime: eventDetails.start,
+    },
+    end: {
+      dateTime: eventDetails.end,
+    },
+  };
+
+  // If google_meet is selected, automatically request Google Meet link creation
+  if (eventDetails.platform === "google_meet") {
+    requestBody.conferenceData = {
+      createRequest: {
+        requestId: Math.random().toString(36).substring(2) + Date.now().toString(),
+        conferenceSolutionKey: {
+          type: "hangoutsMeet",
+        },
+      },
+    };
+  }
+
+  const res = await calendar.events.insert({
+    calendarId: "primary",
+    conferenceDataVersion: eventDetails.platform === "google_meet" ? 1 : undefined,
+    requestBody,
+  });
+
+  return res.data;
+}
