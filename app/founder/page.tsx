@@ -62,6 +62,7 @@ interface Task {
   assignedTo: string;
   deadline: string;
   dueAt?: string | null;
+  meetingId?: string | null;
   priority: Priority;
   source: Source;
   sourceGroup: string;
@@ -1000,7 +1001,13 @@ function DashboardView({
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
-  const sourceFiltered = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
+  const sourceFiltered = tasks.filter((t) => {
+    if (selectedSource === "all") return true;
+    if (selectedSource === "fathom") {
+      return t.source === "fathom" || t.source === "google_meet" || t.source === "zoom" || t.source === "teams" || t.source === "manual";
+    }
+    return t.source === selectedSource;
+  });
 
   // Founder dashboard should only receive: unassigned tasks, company-wide coordination,
   // tasks directed to founders/admins, and tasks where AI could not confidently identify an assignee (Needs Review).
@@ -3716,7 +3723,7 @@ export default function FounderPage() {
                 employeesList={employeesList}
               />
             )}
-            {activeTab === "meetings" && <MeetingTab />}
+            {activeTab === "meetings" && <MeetingTab tasks={tasks} onUpdateTask={updateTask} />}
             {activeTab === "client" && (
               <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} />
             )}

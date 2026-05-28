@@ -111,6 +111,7 @@ export async function GET(req: NextRequest) {
         assignedTo: t.assignee || "Unassigned",
         deadline: t.deadline ? t.deadline.split("T")[0] : new Date().toISOString().split("T")[0],
         dueAt: t.due_at || null,
+        meetingId: t.meeting_id || null,
         priority: t.priority,
         source: t.source_platform || "whatsapp",
         sourceGroup: t.source_group_name || "General Chat",

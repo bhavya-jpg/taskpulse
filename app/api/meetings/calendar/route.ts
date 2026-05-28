@@ -25,15 +25,16 @@ export async function GET(req: NextRequest) {
     // Also fetch our taskpulse processed meetings to see which events are already processed
     const { data: processedMeetings } = await supabaseAdmin
       .from('meetings')
-      .select('event_id')
+      .select('id, event_id')
       .eq('user_id', session.user.id)
       .not('event_id', 'is', null);
 
-    const processedEventIds = new Set(processedMeetings?.map(m => m.event_id) || []);
+    const processedEventMap = new Map(processedMeetings?.map(m => [m.event_id, m.id]) || []);
 
     const enrichedEvents = events.map(ev => ({
       ...ev,
-      isProcessed: ev.id ? processedEventIds.has(ev.id) : false
+      isProcessed: ev.id ? processedEventMap.has(ev.id) : false,
+      meetingId: ev.id ? processedEventMap.get(ev.id) : null
     }));
 
     return NextResponse.json({ success: true, events: enrichedEvents });

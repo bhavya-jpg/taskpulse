@@ -55,6 +55,7 @@ interface Task {
   assignedTo: string;
   deadline: string;
   dueAt?: string | null;
+  meetingId?: string | null;
   priority: Priority;
   source: Source;
   sourceGroup: string;
@@ -773,7 +774,13 @@ function DashboardView({
 }) {
   const [selectedSource, setSelectedSource] = useState<"all" | "email" | "slack" | "fathom">("all");
 
-  const sourceFiltered = tasks.filter((t) => selectedSource === "all" || t.source === selectedSource);
+  const sourceFiltered = tasks.filter((t) => {
+    if (selectedSource === "all") return true;
+    if (selectedSource === "fathom") {
+      return t.source === "fathom" || t.source === "google_meet" || t.source === "zoom" || t.source === "teams" || t.source === "manual";
+    }
+    return t.source === selectedSource;
+  });
   // Strictly filter to current logged-in employee (case-insensitive)
   const filteredTasks = sourceFiltered.filter((t) => t.assignedTo && t.assignedTo.toLowerCase() === empName.toLowerCase());
 
@@ -1888,7 +1895,7 @@ export default function EmployeeDashboard() {
                 employeesList={employeesList}
               />
             )}
-            {activeTab === "meetings" && <MeetingTab />}
+            {activeTab === "meetings" && <MeetingTab tasks={tasks} onUpdateTask={updateTask} />}
             {activeTab === "client" && (
               <ClientView
                 tasks={tasks}

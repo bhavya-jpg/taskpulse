@@ -57,6 +57,8 @@ interface Task {
   client: string;
   assignedTo: string;
   deadline: string;
+  dueAt?: string | null;
+  meetingId?: string | null;
   priority: Priority;
   source: Source;
   sourceGroup: string;

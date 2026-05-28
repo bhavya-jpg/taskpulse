@@ -188,7 +188,12 @@ function formatMarkdown(text: string) {
   return <div className="space-y-1">{elements}</div>;
 }
 
-export function MeetingTab() {
+interface MeetingTabProps {
+  tasks?: any[];
+  onUpdateTask?: (id: number | string, updatedFields: any) => Promise<void>;
+}
+
+export function MeetingTab({ tasks = [], onUpdateTask }: MeetingTabProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -209,6 +214,16 @@ export function MeetingTab() {
     participants: "",
     transcript: null as File | null,
   });
+
+  const handleToggleTaskStatus = async (task: any) => {
+    if (!onUpdateTask) return;
+    const newStatus = task.status === "done" ? "pending" : "done";
+    try {
+      await onUpdateTask(task.id, { status: newStatus });
+    } catch (err) {
+      console.error("Failed to toggle task status", err);
+    }
+  };
 
   const fetchMeetings = async () => {
     try {
@@ -874,6 +889,60 @@ export function MeetingTab() {
                       {selectedEvent.description || "No description provided."}
                     </div>
 
+                    {selectedEvent.isProcessed && (
+                      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                        {(() => {
+                          const calendarTasks = tasks.filter(t => t.meetingId === selectedEvent.meetingId);
+                          return (
+                            <>
+                              <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                                <CheckCircle2 size={13} className="text-teal-500" /> Synced Dashboard Tasks ({calendarTasks.length})
+                              </h4>
+                              {calendarTasks.length > 0 ? (
+                                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                  {calendarTasks.map((t: any) => (
+                                    <div key={t.id} className="bg-slate-50 dark:bg-[#121316] border border-slate-100 dark:border-slate-800 p-2.5 rounded-xl flex items-center justify-between gap-3 group hover:border-slate-200 dark:hover:border-slate-700/80 transition-all shadow-sm">
+                                      <div className="flex items-start gap-2.5 min-w-0">
+                                        <button
+                                          onClick={() => handleToggleTaskStatus(t)}
+                                          className={`flex-shrink-0 mt-0.5 w-4.5 h-4.5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                                            t.status === "done"
+                                              ? "bg-teal-500 border-teal-500 text-white"
+                                              : "border-slate-300 dark:border-slate-600 hover:border-teal-500"
+                                          }`}
+                                        >
+                                          {t.status === "done" && <CheckCircle2 size={12} className="text-white fill-teal-500" />}
+                                        </button>
+                                        <div className="min-w-0">
+                                          <p className={`text-xs font-semibold truncate ${t.status === "done" ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-750 dark:text-slate-200 font-medium"}`}>
+                                            {t.title}
+                                          </p>
+                                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[9px] text-slate-400 font-semibold">
+                                            <span className="flex items-center gap-0.5"><User size={9} /> {t.assignedTo || "Unassigned"}</span>
+                                            <span>•</span>
+                                            <span>{t.priority} Priority</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase flex-shrink-0 ${
+                                        t.status === "done"
+                                          ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                          : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                      }`}>
+                                        {t.status === "done" ? "Done" : "Pending"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400 italic">No tasks have been extracted or associated with this calendar event.</p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex justify-end">
                       {selectedEvent.isProcessed ? (
                         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-semibold bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-lg">
@@ -993,6 +1062,62 @@ export function MeetingTab() {
                             </ul>
                           </div>
                         </div>
+
+                        {(() => {
+                          const meetingTasks = tasks.filter(t => t.meetingId === meeting.id);
+                          return (
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                              <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                                <CheckCircle2 size={13} className="text-teal-500" /> Synced Dashboard Tasks ({meetingTasks.length})
+                              </h4>
+                              {meetingTasks.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {meetingTasks.map((t) => (
+                                    <div key={t.id} className="bg-slate-50 dark:bg-[#121316] border border-slate-100 dark:border-slate-800 p-3 rounded-xl flex items-center justify-between gap-3 group hover:border-slate-200 dark:hover:border-slate-700/80 transition-all shadow-sm">
+                                      <div className="flex items-start gap-2.5 min-w-0">
+                                        <button
+                                          onClick={() => handleToggleTaskStatus(t)}
+                                          className={`flex-shrink-0 mt-0.5 w-4.5 h-4.5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                                            t.status === "done"
+                                              ? "bg-teal-500 border-teal-500 text-white"
+                                              : "border-slate-300 dark:border-slate-600 hover:border-teal-500"
+                                          }`}
+                                        >
+                                          {t.status === "done" && <CheckCircle2 size={12} className="text-white fill-teal-500" />}
+                                        </button>
+                                        <div className="min-w-0">
+                                          <p className={`text-xs font-semibold truncate ${t.status === "done" ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-750 dark:text-slate-200 font-medium"}`}>
+                                            {t.title}
+                                          </p>
+                                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-slate-400 font-semibold">
+                                            <span className="flex items-center gap-0.5"><User size={10} /> {t.assignedTo || "Unassigned"}</span>
+                                            <span>•</span>
+                                            <span>{t.priority} Priority</span>
+                                            {t.deadline && (
+                                              <>
+                                                <span>•</span>
+                                                <span>Due: {t.deadline}</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex-shrink-0 ${
+                                        t.status === "done"
+                                          ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                          : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                      }`}>
+                                        {t.status === "done" ? "Done" : "Pending"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400 italic">No tasks have been extracted or associated with this meeting.</p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </motion.div>
                   )}
