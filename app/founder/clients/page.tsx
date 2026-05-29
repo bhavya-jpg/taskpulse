@@ -38,7 +38,7 @@ import Link from "next/link";
 // =============================================================================
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp";
+type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp" | "teams" | "manual";
 type TaskStatus = "pending" | "done";
 
 // Agency workflow statuses for display

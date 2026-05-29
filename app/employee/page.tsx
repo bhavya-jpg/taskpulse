@@ -45,7 +45,7 @@ import { useRouter } from "next/navigation";
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Priority = "High" | "Medium" | "Low";
-type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp";
+type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp" | "teams" | "manual";
 type Status = "pending" | "done" | "dismissed";
 
 interface Task {

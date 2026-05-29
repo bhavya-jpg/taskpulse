@@ -51,7 +51,7 @@ import Link from "next/link";
 
 type Priority = "High" | "Medium" | "Low";
 
-type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp";
+type Source = "email" | "slack" | "zoom" | "google_meet" | "fathom" | "whatsapp" | "teams" | "manual";
 
 type Status = "pending" | "done" | "dismissed";
 
@@ -1364,6 +1364,8 @@ function ClientView({
   onMarkActive,
   employeesList,
   founderName,
+  onConfirm,
+  onDismiss,
 }: {
   tasks: Task[];
   onMarkDone: (id: number | string) => void;
@@ -1371,6 +1373,8 @@ function ClientView({
   onMarkActive?: (id: number | string) => void;
   employeesList?: string[];
   founderName?: string;
+  onConfirm?: (id: number | string) => void;
+  onDismiss?: (id: number | string) => void;
 }) {
   const router = useRouter();
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -2008,6 +2012,7 @@ function WorkspaceOverviewTab({
   const active = tasks.filter((t) => t.status === "pending");
   const overdue = active.filter((t) => isOverdue(t.deadline));
   const waiting = active.filter((t) => t.confidence < 85);
+  const healthScore = tasks.length === 0 ? 100 : Math.round(((tasks.length - overdue.length) / tasks.length) * 100);
   
   // AI parser state
   const [rawText, setRawText] = useState("");
@@ -2184,7 +2189,7 @@ function WorkspaceKanbanTab({
             <div className="text-center py-10 text-slate-400 italic text-[11px]">No items pending confirmation</div>
           ) : (
             needsConfirm.map((t) => (
-              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} showConfirmButtons={true} founderName={founderName} />
+              <TaskCard key={t.id} task={t} onMarkDone={onMarkDone} isFounder={true} onUpdateTask={onUpdateTask} onMarkActive={onMarkActive} employeesList={employeesList} showConfirmButtons={true} founderName={founderName} onConfirm={onConfirm} onDismiss={onDismiss} />
             ))
           )}
         </div>
@@ -3690,45 +3695,39 @@ export default function FounderPage() {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: "done" } : t));
     addToast("Task marked as done!");
 
-    if (typeof id === "string") {
-      try {
-        await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, status: "done" }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "done" }),
+      });
+    } catch {}
   };
 
   const confirmTask = async (id: number | string) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 95 } : t));
     addToast("Task confirmed and added to dashboard!");
 
-    if (typeof id === "string") {
-      try {
-        await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, status: "confirmed" }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "confirmed" }),
+      });
+    } catch {}
   };
 
   const sendTaskToReview = async (id: number | string) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, confidence: 80 } : t));
     addToast("Task sent back to review!");
 
-    if (typeof id === "string") {
-      try {
-        await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, status: "unconfirmed" }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "unconfirmed" }),
+      });
+    } catch {}
   };
 
   const sendTaskToActive = async (id: number | string) => {
@@ -3739,15 +3738,13 @@ export default function FounderPage() {
     );
     addToast("Task sent back to active!");
 
-    if (typeof id === "string") {
-      try {
-        await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, status: "confirmed" }),
-        });
-      } catch {}
-    }
+    try {
+      await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "confirmed" }),
+      });
+    } catch {}
   };
 
   const dismissTask = async (id: number | string) => {
@@ -3981,7 +3978,7 @@ export default function FounderPage() {
             )}
             {activeTab === "meetings" && <MeetingTab tasks={tasks} onUpdateTask={updateTask} />}
             {activeTab === "client" && (
-              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} founderName={onboardingData?.name || session?.user?.name || "Bhavya"} />
+              <ClientView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} founderName={onboardingData?.name || session?.user?.name || "Bhavya"} onConfirm={confirmTask} onDismiss={dismissTask} />
             )}
             {activeTab === "employee" && (
               <EmployeeView tasks={tasks} onMarkDone={markDone} onUpdateTask={updateTask} onMarkActive={sendTaskToActive} employeesList={employeesList} founderName={onboardingData?.name || session?.user?.name || "Bhavya"} />
