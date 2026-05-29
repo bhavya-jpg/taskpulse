@@ -95,6 +95,21 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
+    // Trigger: Activity Log
+    try {
+      await supabaseAdmin.from("activity_logs").insert({
+        company,
+        client_name: formattedName,
+        event_type: "client",
+        event_name: "Client Whitelisted",
+        description: `AI scanning whitelist activated for brand "${formattedName}". Routing for Gmail, Slack, and WhatsApp triggers enabled.`,
+        metadata: { client_id: data.id },
+        user_name: "Founder"
+      });
+    } catch (e) {
+      console.warn("[Clients API] Could not write activity log (compatible fallback mode):", e);
+    }
+
     return NextResponse.json({ success: true, client: data });
   } catch (err) {
     console.error("[Clients POST API Error]:", err);

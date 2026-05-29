@@ -92,3 +92,27 @@ ALTER TABLE stakeholders DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_at timestamptz;
 
 
+-- ─── 9. CLIENT ACTIVITY TIMELINE LOGS ────────────────────────────────────────
+-- Stores audit timeline log events for whitelisted clients.
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company      text NOT NULL,
+  client_name  text NOT NULL,
+  event_type   text NOT NULL CHECK (event_type IN ('meeting', 'task', 'communication', 'client')),
+  event_name   text NOT NULL,
+  description  text NOT NULL,
+  metadata     jsonb DEFAULT '{}'::jsonb,
+  user_name    text DEFAULT 'System',
+  created_at   timestamptz DEFAULT now()
+);
+
+-- Disable RLS on the activity_logs table for collaborative testing simplicity
+ALTER TABLE activity_logs DISABLE ROW LEVEL SECURITY;
+
+
+-- ─── 10. TASK TRACKING FOR FOUNDER MONITORING ────────────────────────────────
+-- Add a column to support founder tracking/monitoring of employee tasks.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tracked_by_founder boolean DEFAULT false;
+
+
+

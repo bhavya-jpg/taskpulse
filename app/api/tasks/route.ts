@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
         sourceMessageId: t.source_message_id || null,
         isBlocked,
         blockerNote,
+        trackedByFounder: t.tracked_by_founder || false,
       };
     });
 
@@ -138,7 +139,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client, dueAt } = body;
+    const { id, status, assignee, isBlocked, blockerNote, title, priority, deadline, client, dueAt, trackedByFounder } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
  
     const updateFields: any = {};
@@ -148,6 +149,9 @@ export async function PUT(req: NextRequest) {
     }
     if (assignee !== undefined) {
       updateFields.assignee = assignee;
+    }
+    if (trackedByFounder !== undefined) {
+      updateFields.tracked_by_founder = trackedByFounder;
     }
     if (title !== undefined) {
       updateFields.title = title;
@@ -175,7 +179,7 @@ export async function PUT(req: NextRequest) {
     // 1. Fetch current user's profile to resolve company
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("company")
+      .select("company, name")
       .eq("id", userId)
       .single();
 
@@ -190,9 +194,72 @@ export async function PUT(req: NextRequest) {
       updateQuery = updateQuery.eq("user_id", userId);
     }
 
-    const { error } = await updateQuery;
+    // Fetch current task first for activity log diffs
+    const { data: currentTask } = await supabaseAdmin
+      .from("tasks")
+      .select("*")
+      .eq("id", id)
+      .single();
 
+    const { error } = await updateQuery;
     if (error) throw error;
+
+    // Trigger: Activity Log
+    if (currentTask) {
+      let clientName = "No Client";
+      if (currentTask.source_group_name) {
+        const sgn = currentTask.source_group_name.trim();
+        if (sgn === "No Client" || sgn === "Internal Task" || sgn === "No Client Campaign" || sgn === "Internal Task Campaign" || sgn === "#manual-tasks") {
+          clientName = "No Client";
+        } else if (sgn.includes(" - ")) {
+          clientName = sgn.split(" - ")[0].trim();
+        } else if (sgn.endsWith(" Campaign")) {
+          clientName = sgn.replace(/ Campaign$/, "").trim();
+        } else {
+          clientName = sgn.split(" ")[0].trim();
+        }
+      }
+      if (clientName === "General" && (!currentTask.source_group_name || currentTask.source_group_name === "General Chat")) {
+        clientName = "No Client";
+      }
+
+      let eventName = "Task Updated";
+      let logDesc = `Task "${currentTask.title}" details updated.`;
+
+      if (status === "done" && currentTask.status !== "done") {
+        eventName = "Task Completed";
+        logDesc = `Deliverable "${currentTask.title}" was marked as completed.`;
+      } else if (status === "confirmed" && currentTask.status === "unconfirmed") {
+        eventName = "Task Confirmed";
+        logDesc = `AI-extracted deliverable "${currentTask.title}" confirmed by Founder.`;
+      } else if (assignee !== undefined && assignee !== currentTask.assignee) {
+        eventName = "Task Reassigned";
+        logDesc = `Task "${currentTask.title}" reassigned to ${assignee || "Rahul"}.`;
+      } else if (isBlocked === true && !currentTask.source_quote?.includes('"isBlocked":true')) {
+        eventName = "Task Blocked";
+        logDesc = `Task "${currentTask.title}" blocked: "${blockerNote || "No blocker note provided."}"`;
+      } else if (isBlocked === false && currentTask.source_quote?.includes('"isBlocked":true')) {
+        eventName = "Task Blocker Resolved";
+        logDesc = `Task "${currentTask.title}" blocker resolved.`;
+      } else if (priority !== undefined && priority !== currentTask.priority) {
+        eventName = "Priority Changed";
+        logDesc = `Task "${currentTask.title}" priority updated from ${currentTask.priority} to ${priority}.`;
+      }
+
+      try {
+        await supabaseAdmin.from("activity_logs").insert({
+          company: profile?.company || "General",
+          client_name: clientName,
+          event_type: "task",
+          event_name: eventName,
+          description: logDesc,
+          metadata: { task_id: id, assignee: assignee || currentTask.assignee, priority: priority || currentTask.priority },
+          user_name: profile?.name || "System"
+        });
+      } catch (e) {
+        console.warn("[Tasks API PUT] Could not write activity log:", e);
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -207,13 +274,13 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as any).id;
 
   try {
-    const { title, client, assignedTo, priority, deadline, dueAt } = await req.json();
+    const { title, client, assignedTo, priority, deadline, dueAt, trackedByFounder } = await req.json();
     if (!title || !client) return NextResponse.json({ error: "title and client are required" }, { status: 400 });
  
     // 1. Fetch current user's profile to resolve company
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("company")
+      .select("company, name")
       .eq("id", userId)
       .single();
  
@@ -238,6 +305,10 @@ export async function POST(req: NextRequest) {
     if (dueAt) {
       insertData.due_at = dueAt;
     }
+
+    if (trackedByFounder !== undefined) {
+      insertData.tracked_by_founder = trackedByFounder;
+    }
  
     const { data, error } = await supabaseAdmin
       .from("tasks")
@@ -245,6 +316,24 @@ export async function POST(req: NextRequest) {
       .select();
 
     if (error) throw error;
+
+    // Trigger: Activity Log
+    try {
+      if (data?.[0]) {
+        const createdTask = data[0];
+        await supabaseAdmin.from("activity_logs").insert({
+          company: profile?.company || "General",
+          client_name: clientName,
+          event_type: "task",
+          event_name: "Task Created",
+          description: `Task "${createdTask.title}" manually created and assigned to ${createdTask.assignee || "Rahul"}.`,
+          metadata: { task_id: createdTask.id, assignee: createdTask.assignee, priority: createdTask.priority },
+          user_name: profile?.name || "System"
+        });
+      }
+    } catch (e) {
+      console.warn("[Tasks API POST] Could not write activity log:", e);
+    }
 
     return NextResponse.json({ success: true, data: data?.[0] });
   } catch (err) {

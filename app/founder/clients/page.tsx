@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 // =============================================================================
@@ -68,6 +68,7 @@ interface Task {
   sourceMessageId?: string | null;
   isBlocked?: boolean;
   blockerNote?: string;
+  trackedByFounder?: boolean;
 }
 
 interface Stakeholder {
@@ -976,52 +977,214 @@ function FilesPlaceholderTab({ clientName }: { clientName: string }) {
 }
 
 function ActivityLogTab({ tasks, clientName }: { tasks: Task[]; clientName: string }) {
-  // Generate synthetic activity entries from tasks
-  const activities = tasks
-    .slice(0, 15)
-    .map((t, i) => ({
-      id: t.id,
-      title: t.status === "done"
-        ? `"${t.title}" marked as completed`
-        : isOverdue(t.deadline)
-        ? `"${t.title}" is overdue`
-        : `"${t.title}" assigned to ${t.assignedTo}`,
-      subtitle: `${getSourceLabel(t.source)} · ${t.sourceGroup}`,
-      type: t.status === "done" ? "completed" : isOverdue(t.deadline) ? "overdue" : "assigned",
-      date: t.deadline,
-    }));
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch(`/api/activity-logs?client=${encodeURIComponent(clientName)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.logs)) {
+        setLogs(data.logs);
+      }
+    } catch (e) {
+      console.error("Failed to fetch logs:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 5000);
+    return () => clearInterval(interval);
+  }, [clientName]);
+
+  // Filtering logic
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      // 1. Search Query Filter
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase();
+        const titleMatch = log.event_name?.toLowerCase().includes(query);
+        const descMatch = log.description?.toLowerCase().includes(query);
+        if (!titleMatch && !descMatch) return false;
+      }
+
+      // 2. Event Type Filter
+      if (filterType !== "all" && log.event_type !== filterType) {
+        return false;
+      }
+
+      // 3. Date Range Filter
+      if (dateFilter !== "all") {
+        const logDate = new Date(log.created_at).getTime();
+        const now = Date.now();
+        const diff = now - logDate;
+        if (dateFilter === "today" && diff > 24 * 3600 * 1000) return false;
+        if (dateFilter === "week" && diff > 7 * 24 * 3600 * 1000) return false;
+        if (dateFilter === "month" && diff > 30 * 24 * 3600 * 1000) return false;
+      }
+
+      return true;
+    });
+  }, [logs, searchQuery, filterType, dateFilter]);
+
+  const getLogIcon = (type: string) => {
+    switch (type) {
+      case "meeting":
+        return <Video size={11} className="text-indigo-600 dark:text-indigo-300" />;
+      case "task":
+        return <CheckCircle2 size={11} className="text-teal-600 dark:text-teal-300" />;
+      case "communication":
+        return <Mail size={11} className="text-violet-600 dark:text-violet-300" />;
+      case "client":
+        return <Briefcase size={11} className="text-amber-600 dark:text-amber-300" />;
+      default:
+        return <Activity size={11} className="text-slate-600 dark:text-slate-300" />;
+    }
+  };
+
+  const getLogColorClass = (type: string) => {
+    switch (type) {
+      case "meeting":
+        return "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/25";
+      case "task":
+        return "bg-teal-50 dark:bg-teal-500/10 border-teal-100 dark:border-teal-500/25";
+      case "communication":
+        return "bg-violet-50 dark:bg-violet-500/10 border-violet-100 dark:border-violet-500/25";
+      case "client":
+        return "bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/25";
+      default:
+        return "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60";
+    }
+  };
 
   return (
-    <div className="bg-white dark:bg-[#15171b] rounded-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-sm">
-      <div className="px-4 py-3 border-b border-slate-200/70 dark:border-slate-700/60">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Activity Log</h3>
-        <p className="text-[10px] text-slate-500 dark:text-slate-400">Recent events for {clientName}</p>
+    <div className="bg-white dark:bg-[#15171b] border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-5 space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-850 dark:text-slate-200 flex items-center gap-2">
+            <Activity size={16} className="text-teal-600 dark:text-teal-400" />
+            Audit Activity Log Timeline
+          </h3>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+            A professional chronological history & audit trail for {clientName} whitelisted brand.
+          </p>
+        </div>
       </div>
 
-      {activities.length === 0 ? (
-        <div className="p-6">
-          <EmptyPlaceholder
-            icon={<Activity size={20} className="text-slate-400" />}
-            title="No activity yet"
-            subtitle="Activity will appear here as tasks are created and updated."
-          />
+      {/* Control bar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <input
+          type="text"
+          placeholder="Search activity events..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-teal-500 font-semibold"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-650 dark:text-slate-350 outline-none cursor-pointer"
+          >
+            <option value="all">All Event Types</option>
+            <option value="task">Deliverable Tasks</option>
+            <option value="meeting">Sync Meetings</option>
+            <option value="communication">Channel Syncs</option>
+            <option value="client">Client Whitelist</option>
+          </select>
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="bg-slate-50 dark:bg-[#101114] border border-slate-200/70 dark:border-slate-800/85 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-650 dark:text-slate-350 outline-none cursor-pointer"
+          >
+            <option value="all">All Dates</option>
+            <option value="today">Past 24 Hours</option>
+            <option value="week">Past 7 Days</option>
+            <option value="month">Past 30 Days</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+          <Loader2 size={20} className="animate-spin text-teal-600" />
+          <span className="text-xs font-medium">Loading audit history...</span>
+        </div>
+      ) : filteredLogs.length === 0 ? (
+        <div className="text-center py-10 text-slate-400 italic text-xs">
+          No matching activity log events recorded.
         </div>
       ) : (
-        <div className="px-4 py-2">
-          {activities.map((act, i) => (
-            <div key={`${act.id}-${i}`} className="flex items-start gap-3 py-3 border-b border-slate-100 dark:border-slate-800/50 last:border-0">
-              <div className="flex flex-col items-center mt-0.5">
-                <div className={`w-2.5 h-2.5 rounded-full ${
-                  act.type === "completed" ? "bg-emerald-500" : act.type === "overdue" ? "bg-amber-500" : "bg-teal-500"
-                }`} />
-                {i < activities.length - 1 && <div className="w-px flex-1 bg-slate-200 dark:bg-slate-700 mt-1 min-h-[20px]" />}
+        <div className="relative border-l border-slate-150 dark:border-slate-800/80 pl-5 ml-3.5 space-y-5">
+          {filteredLogs.map((log) => {
+            const isExpanded = expandedLogId === log.id;
+            const formattedDate = new Date(log.created_at).toLocaleString("en-IN", {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit"
+            });
+            const hasMeta = log.metadata && Object.keys(log.metadata).length > 0;
+
+            return (
+              <div key={log.id} className="relative group">
+                <span className={`absolute -left-[27.5px] top-1.5 w-4 h-4 rounded-full border border-slate-200 dark:border-slate-700/80 flex items-center justify-center shadow-sm ${getLogColorClass(log.event_type)}`}>
+                  {getLogIcon(log.event_type)}
+                </span>
+                
+                <div className="bg-slate-50/40 dark:bg-white/[0.01] hover:bg-slate-50 dark:hover:bg-white/[0.02] border border-slate-150/40 dark:border-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800 rounded-xl p-3.5 transition-all flex flex-col gap-1.5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="text-[9px] text-slate-455 dark:text-slate-500 font-extrabold uppercase tracking-wide">
+                        {log.event_name}
+                      </span>
+                      <p className="text-xs font-bold text-slate-850 dark:text-slate-150 leading-snug">
+                        {log.description}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-slate-455 dark:text-slate-500 font-bold shrink-0 text-right">
+                      {formattedDate}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/40 pt-2 mt-0.5">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-455 font-bold flex items-center gap-1">
+                      <User size={10} className="text-teal-600 dark:text-teal-400" />
+                      Triggered by: <span className="font-semibold text-slate-650 dark:text-slate-350">{log.user_name || "System"}</span>
+                    </span>
+
+                    {hasMeta && (
+                      <button
+                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                        className="text-[9px] font-bold text-teal-650 dark:text-teal-400 hover:underline flex items-center gap-0.5 cursor-pointer bg-transparent border-0 outline-none"
+                      >
+                        {isExpanded ? "Collapse Details" : "View Metadata"}
+                        <ChevronRight size={10} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+
+                  {isExpanded && hasMeta && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-2 p-2.5 bg-slate-100/50 dark:bg-[#101114] border border-slate-200/50 dark:border-slate-800/80 rounded-lg overflow-x-auto text-[10px] font-mono text-slate-600 dark:text-slate-400 leading-normal"
+                    >
+                      <pre className="no-scrollbar whitespace-pre-wrap">{JSON.stringify(log.metadata, null, 2)}</pre>
+                    </motion.div>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{act.title}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{act.subtitle} · {formatDate(act.date)}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1265,9 +1428,11 @@ function ClientCard({
 // MAIN PAGE
 // =============================================================================
 
-export default function ClientCommandCenterPage() {
+function ClientCommandCenterContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const clientParam = searchParams.get("client");
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -1282,6 +1447,12 @@ export default function ClientCommandCenterPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (clientParam) {
+      setActiveClient(clientParam);
+    }
+  }, [clientParam]);
 
   // Load tasks from API
   useEffect(() => {
@@ -1529,5 +1700,20 @@ export default function ClientCommandCenterPage() {
         clientName={stakeholderModalClient}
       />
     </div>
+  );
+}
+
+export default function ClientCommandCenterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f6f2] dark:bg-[#0b0c0e]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-teal-600 border-t-transparent animate-spin" />
+          <p className="text-xs text-slate-500 font-semibold animate-pulse">Loading Command Center...</p>
+        </div>
+      </div>
+    }>
+      <ClientCommandCenterContent />
+    </Suspense>
   );
 }
